@@ -18,7 +18,7 @@ License summary:
 | `assets/characters/character-{male,female}-{a..f}.glb`, `assets/characters/Textures/colormap.png` | [Mini Characters](https://kenney.nl/assets/mini-characters) | Kenney | CC0 | GLB + PNG | None. Scaled 2.65x at runtime; built-in animations (idle, walk, sprint, die, holding-both, ...) used. |
 | `assets/maps/city/*.glb` (building-a..h, building-skyscraper-a/b, detail-awning) + `Textures/colormap.png` | [City Kit (Commercial)](https://kenney.nl/assets/city-kit-commercial) | Kenney | CC0 | GLB + PNG | None. Scaled 9x at runtime; box colliders generated from mesh bounds. |
 | `assets/maps/survival/*.glb` (barrel, box, box-large, chest, fence-fortified, rock-a/b/c, structure-metal, structure-metal-wall, tent, tree, tree-tall, tree-autumn) + `Textures/colormap.png` | [Survival Kit](https://kenney.nl/assets/survival-kit) | Kenney | CC0 | GLB + PNG | None. Scaled at runtime. `chest.glb` is used for BR supply crates. |
-| `assets/vehicles/*.glb` (suv, truck, sedan, van, delivery, police, cone, box) + `Textures/colormap.png` | [Car Kit](https://kenney.nl/assets/car-kit) | Kenney | CC0 | GLB + PNG | None. Used as static cover props (vehicles are not drivable). |
+| `assets/vehicles/*.glb` (suv, truck, sedan, van, delivery, police, cone, box) + `Textures/colormap.png` | [Car Kit](https://kenney.nl/assets/car-kit) | Kenney | CC0 | GLB + PNG | None. `suv`, `sedan`, `truck`, `police`, `van` are also used as **drivable vehicles** in Battle Royale (wheel nodes re-parented under `VehicleWheel3D` at runtime, scaled 1.45x); the rest are static cover props. |
 
 | `assets/arms/arms.glb`, `arm_albedo_pale.png`, `arm_albedo_dark.png` (+ `LICENSE-CC0.txt`) | [WRAD Arms](https://github.com/wwwriks/wrad-arms) (also on [itch.io](https://wriks.itch.io/wrad-arms)), commit `f398724` | wriks | CC0 | GLB + PNG | None to the files. Posed at runtime with code-driven two-bone IK and finger curl; sleeves are procedural meshes attached to the arm bones. The asset has no animations; all first-person animations are procedural. |
 
@@ -44,7 +44,12 @@ touch buttons) are generated in code.
 | `assets/audio/sfx/hitmarker.ogg`, `killconfirm.ogg`, `bullet_impact.ogg`, `land.ogg`, `loot_pickup.ogg`, `melee.ogg`, `assets/audio/footsteps/footstep_{concrete,grass}_00{0-4}.ogg` | [Impact Sounds](https://kenney.nl/assets/impact-sounds) | Kenney | CC0 | OGG | Renamed (from impactMetal_light_000, impactPlate_heavy_000, impactGeneric_light_000/002, impactPlank_medium_000, impactMetal_medium_000, footstep_*). |
 | `assets/audio/sfx/explosion.ogg`, `explosion_low.ogg`, `zone_warning.ogg` | [Sci-Fi Sounds](https://kenney.nl/assets/sci-fi-sounds) | Kenney | CC0 | OGG | Renamed (from explosionCrunch_000, lowFrequency_explosion_000, forceField_000). |
 | `assets/audio/ui/*.ogg` (click_001/002, confirmation_001, back_001, error_001, select_001, switch_002, toggle_001) | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | Kenney | CC0 | OGG | None. |
-| `assets/audio/music/menu_music.ogg`, `assets/audio/ambience/wind.ogg`, `assets/audio/weapons/dryfire.ogg` | Original, generated for this project (procedural synthesis with Python/NumPy, encoded with ffmpeg) | This project | Same license as the project code | OGG | — |
+| `assets/audio/music/menu_music.ogg`, `assets/audio/ambience/wind.ogg`, `assets/audio/weapons/dryfire.ogg`, `assets/audio/sfx/engine_loop.ogg` (vehicle engine loop) | Original, generated for this project (procedural synthesis with Python/NumPy, encoded with ffmpeg) | This project | Same license as the project code | OGG | — |
+
+## Procedural (no asset files)
+
+- Domination flags (pole, flag, capture ring), parachute, aircraft, smoke trails and sleeves are built at runtime
+  from Godot primitive meshes in code.
 
 ## Engine and fonts
 
