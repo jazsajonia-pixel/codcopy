@@ -1,0 +1,445 @@
+extends CanvasLayer
+## In-game HUD for both modes. Built in code so layout adapts to any aspect ratio and safe area.
+
+var match_node: MatchBase
+var player: Player
+
+var root: Control
+var overlay: HudOverlay
+var touch: TouchControls
+var minimap: Minimap
+var bigmap: Minimap
+var score_box: HBoxContainer
+var score_a: Label
+var score_b: Label
+var timer_label: Label
+var br_label: Label
+var killfeed: VBoxContainer
+var health_bar: ProgressBar
+var armor_bar: ProgressBar
+var health_label: Label
+var weapon_label: Label
+var ammo_label: Label
+var equip_label: Label
+var reload_bar: ProgressBar
+var use_bar: ProgressBar
+var interact_label: Label
+var announce: Label
+var announce_sub: Label
+var announce_t := 0.0
+var death_panel: Control
+var death_label: Label
+var pause_panel: Control
+var scoreboard_panel: PanelContainer
+var scoreboard_list: VBoxContainer
+var fps_label: Label
+var hint_label: Label
+var streak_label: Label
+var streak_t := 0.0
+
+
+func _ready() -> void:
+	layer = 5
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	root = Control.new()
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.theme = UITheme.get_theme()
+	add_child(root)
+	overlay = HudOverlay.new()
+	overlay.player = player
+	root.add_child(overlay)
+	_build_top()
+	_build_bottom()
+	_build_center()
+	_build_touch()
+	_build_pause()
+	_build_scoreboard()
+	_build_bigmap()
+	player.hit_confirmed.connect(overlay.on_hit)
+	player.damaged.connect(func(_a, from, _att): overlay.on_damaged(from))
+	player.interact_target_changed.connect(_on_interact_target)
+	player.killed_enemy.connect(_on_player_kill)
+	match_node.kill_feed.connect(_on_kill_feed)
+	match_node.announcement.connect(show_announcement)
+	get_viewport().size_changed.connect(_layout)
+	_layout()
+
+
+func _safe() -> Rect2:
+	return UITheme.safe_rect(get_viewport())
+
+
+func _build_top() -> void:
+	minimap = Minimap.new()
+	minimap.match_node = match_node
+	minimap.player = player
+	minimap.radius_m = 120.0 if MatchConfig.mode == "br" else 45.0
+	root.add_child(minimap)
+	score_box = HBoxContainer.new()
+	score_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	score_box.add_theme_constant_override("separation", 6)
+	root.add_child(score_box)
+	score_a = _score_chip(UITheme.FRIENDLY)
+	timer_label = UITheme.shadowed(UITheme.label("0:00", 24, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	timer_label.custom_minimum_size = Vector2(90, 0)
+	score_b = _score_chip(UITheme.ENEMY)
+	score_box.add_child(score_a.get_parent())
+	score_box.add_child(timer_label)
+	score_box.add_child(score_b.get_parent())
+	br_label = UITheme.shadowed(UITheme.label("", 20, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	root.add_child(br_label)
+	killfeed = VBoxContainer.new()
+	killfeed.alignment = BoxContainer.ALIGNMENT_BEGIN
+	killfeed.add_theme_constant_override("separation", 2)
+	root.add_child(killfeed)
+	fps_label = UITheme.label("", 14, UITheme.MUTED)
+	root.add_child(fps_label)
+
+
+func _score_chip(c: Color) -> Label:
+	var p := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(c, 0.75)
+	sb.set_corner_radius_all(4)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	p.add_theme_stylebox_override("panel", sb)
+	var l := UITheme.label("0", 26, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	l.custom_minimum_size = Vector2(56, 0)
+	p.add_child(l)
+	return l
+
+
+func _build_bottom() -> void:
+	health_bar = ProgressBar.new()
+	health_bar.show_percentage = false
+	health_bar.max_value = 100
+	var hf := StyleBoxFlat.new()
+	hf.bg_color = Color(0.92, 0.92, 0.88)
+	hf.set_corner_radius_all(3)
+	health_bar.add_theme_stylebox_override("fill", hf)
+	root.add_child(health_bar)
+	armor_bar = ProgressBar.new()
+	armor_bar.show_percentage = false
+	var af := StyleBoxFlat.new()
+	af.bg_color = Color(0.35, 0.62, 1.0)
+	af.set_corner_radius_all(3)
+	armor_bar.add_theme_stylebox_override("fill", af)
+	root.add_child(armor_bar)
+	health_label = UITheme.shadowed(UITheme.label("100", 18))
+	root.add_child(health_label)
+	weapon_label = UITheme.shadowed(UITheme.label("", 20, UITheme.TEXT, HORIZONTAL_ALIGNMENT_RIGHT))
+	root.add_child(weapon_label)
+	ammo_label = UITheme.shadowed(UITheme.label("", 34, UITheme.TEXT, HORIZONTAL_ALIGNMENT_RIGHT))
+	root.add_child(ammo_label)
+	equip_label = UITheme.shadowed(UITheme.label("", 16, UITheme.MUTED, HORIZONTAL_ALIGNMENT_RIGHT))
+	root.add_child(equip_label)
+	hint_label = UITheme.shadowed(UITheme.label("", 15, UITheme.MUTED))
+	root.add_child(hint_label)
+
+
+func _build_center() -> void:
+	reload_bar = ProgressBar.new()
+	reload_bar.show_percentage = false
+	reload_bar.visible = false
+	root.add_child(reload_bar)
+	use_bar = ProgressBar.new()
+	use_bar.show_percentage = false
+	use_bar.visible = false
+	root.add_child(use_bar)
+	interact_label = UITheme.shadowed(UITheme.label("", 20, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	root.add_child(interact_label)
+	announce = UITheme.shadowed(UITheme.label("", 54, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	root.add_child(announce)
+	announce_sub = UITheme.shadowed(UITheme.label("", 22, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	root.add_child(announce_sub)
+	streak_label = UITheme.shadowed(UITheme.label("", 26, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	root.add_child(streak_label)
+	death_panel = Control.new()
+	death_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	death_panel.visible = false
+	root.add_child(death_panel)
+	death_label = UITheme.shadowed(UITheme.label("", 30, UITheme.ENEMY, HORIZONTAL_ALIGNMENT_CENTER))
+	death_panel.add_child(death_label)
+
+
+func _build_touch() -> void:
+	touch = TouchControls.new()
+	touch.player = player
+	touch.br_mode = MatchConfig.mode == "br"
+	touch.on_pause = func(): match_node.toggle_pause()
+	touch.on_score = func(show: bool): scoreboard_panel.visible = show
+	root.add_child(touch)
+	var scheme: String = SaveManager.get_setting("controls", "scheme", "auto")
+	var use_touch := scheme == "touch" or (scheme == "auto" and (DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")))
+	touch.visible = use_touch
+	player.touch_mode = use_touch
+	if not use_touch and not MatchConfig.autoplay_player and DisplayServer.get_name() != "headless":
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _build_pause() -> void:
+	pause_panel = ColorRect.new()
+	(pause_panel as ColorRect).color = Color(0, 0, 0, 0.6)
+	pause_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_panel.visible = false
+	root.add_child(pause_panel)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_panel.add_child(center)
+	var p := UITheme.panel(Vector2(420, 0))
+	center.add_child(p)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 12)
+	p.add_child(v)
+	v.add_child(UITheme.label("PAUSED", 34, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UITheme.button("Resume", func(): match_node.toggle_pause(), Vector2(380, 64)))
+	v.add_child(UITheme.button("Restart Match", func(): MatchConfig.start_match(), Vector2(380, 64)))
+	# Quick sensitivity tweak without leaving the match.
+	var sl := HSlider.new()
+	sl.min_value = 0.2
+	sl.max_value = 3.0
+	sl.step = 0.05
+	sl.value = SaveManager.get_setting("controls", "look_sensitivity", 1.0)
+	var sl_label := UITheme.label("Look sensitivity: %.2f" % sl.value, 18)
+	sl.value_changed.connect(func(val):
+		sl_label.text = "Look sensitivity: %.2f" % val
+		SaveManager.set_setting("controls", "look_sensitivity", val)
+		SaveManager.set_setting("controls", "mouse_sensitivity", val)
+		SaveManager.save_settings())
+	v.add_child(sl_label)
+	v.add_child(sl)
+	v.add_child(UITheme.button("Quit to Menu", func(): MatchConfig.to_menu(), Vector2(380, 64), "back"))
+
+
+func _build_scoreboard() -> void:
+	scoreboard_panel = UITheme.panel(Vector2(640, 0))
+	scoreboard_panel.visible = false
+	root.add_child(scoreboard_panel)
+	scoreboard_list = VBoxContainer.new()
+	scoreboard_list.add_theme_constant_override("separation", 2)
+	scoreboard_panel.add_child(scoreboard_list)
+
+
+func _build_bigmap() -> void:
+	bigmap = Minimap.new()
+	bigmap.match_node = match_node
+	bigmap.player = player
+	bigmap.full_map = true
+	bigmap.visible = false
+	root.add_child(bigmap)
+
+
+func toggle_big_map() -> void:
+	bigmap.visible = not bigmap.visible
+
+
+func _layout() -> void:
+	var s := _safe()
+	var vs := root.get_viewport_rect().size
+	root.position = Vector2.ZERO
+	root.size = vs
+	for full in [overlay, touch]:
+		full.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		full.position = Vector2.ZERO
+		full.size = vs
+	var mm := clampf(s.size.y * 0.27, 150, 220)
+	minimap.position = s.position + Vector2(16, 16)
+	minimap.size = Vector2(mm, mm)
+	score_box.position = Vector2(s.position.x + s.size.x * 0.5 - 140, s.position.y + 10)
+	score_box.size = Vector2(280, 40)
+	br_label.position = Vector2(s.position.x + s.size.x * 0.5 - 250, s.position.y + 54)
+	br_label.size = Vector2(500, 30)
+	killfeed.position = Vector2(s.end.x - 430, s.position.y + 70)
+	killfeed.size = Vector2(414, 200)
+	fps_label.position = s.position + Vector2(20, mm + 22)
+	var bw := clampf(s.size.x * 0.24, 220, 360)
+	health_bar.position = Vector2(s.position.x + s.size.x * 0.5 - bw * 0.5, s.end.y - 46)
+	health_bar.size = Vector2(bw, 14)
+	armor_bar.position = health_bar.position + Vector2(0, -12)
+	armor_bar.size = Vector2(bw, 8)
+	health_label.position = health_bar.position + Vector2(-60, -8)
+	health_label.size = Vector2(54, 26)
+	weapon_label.position = Vector2(s.end.x - 420, s.end.y - 150)
+	weapon_label.size = Vector2(400, 28)
+	ammo_label.position = Vector2(s.end.x - 420, s.end.y - 120)
+	ammo_label.size = Vector2(400, 44)
+	equip_label.position = Vector2(s.end.x - 420, s.end.y - 76)
+	equip_label.size = Vector2(400, 24)
+	if player.touch_mode:
+		# Keep weapon info clear of the right-thumb button cluster.
+		for l in [weapon_label, ammo_label, equip_label]:
+			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			l.position.x = s.position.x + s.size.x * 0.5 - 200
+		weapon_label.position.y = s.end.y - 178
+		ammo_label.position.y = s.end.y - 150
+		equip_label.position.y = s.end.y - 108
+	hint_label.position = Vector2(s.position.x + 20, s.end.y - 30)
+	hint_label.size = Vector2(700, 24)
+	var c := s.get_center()
+	reload_bar.position = c + Vector2(-80, 60)
+	reload_bar.size = Vector2(160, 8)
+	use_bar.position = c + Vector2(-110, 90)
+	use_bar.size = Vector2(220, 12)
+	interact_label.position = c + Vector2(-300, 110)
+	interact_label.size = Vector2(600, 30)
+	announce.position = Vector2(s.position.x, s.position.y + s.size.y * 0.22)
+	announce.size = Vector2(s.size.x, 70)
+	announce_sub.position = announce.position + Vector2(0, 68)
+	announce_sub.size = Vector2(s.size.x, 30)
+	streak_label.position = Vector2(s.position.x, c.y - 120)
+	streak_label.size = Vector2(s.size.x, 34)
+	death_panel.position = Vector2.ZERO
+	death_panel.size = vs
+	death_label.position = Vector2(0, vs.y * 0.3)
+	death_label.size = Vector2(vs.x, 80)
+	scoreboard_panel.position = c - Vector2(320, 200)
+	var bm := minf(s.size.x, s.size.y) * 0.85
+	bigmap.position = c - Vector2(bm, bm) * 0.5
+	bigmap.size = Vector2(bm, bm)
+
+
+func show_announcement(text: String, sub: String) -> void:
+	announce.text = text
+	announce_sub.text = sub
+	announce_t = 2.6
+
+
+func show_pause(p: bool) -> void:
+	pause_panel.visible = p
+	touch.release_all()
+	touch.visible = not p and player.touch_mode
+	if not p and not player.touch_mode and DisplayServer.get_name() != "headless":
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if get_tree().paused and event.is_action_pressed("pause"):
+		match_node.toggle_pause()
+		get_viewport().set_input_as_handled()
+	if event.is_action_pressed("scoreboard"):
+		scoreboard_panel.visible = true
+	elif event.is_action_released("scoreboard"):
+		scoreboard_panel.visible = false
+	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_M:
+		toggle_big_map()
+
+
+func _on_interact_target(t: Node) -> void:
+	if t and is_instance_valid(t) and t.has_method("prompt"):
+		var txt: String = t.prompt()
+		interact_label.text = txt + ("" if player.touch_mode else "  [F]")
+		touch.set_interact_available(true, "OPEN" if t.get("kind") == "crate" else "PICK")
+	else:
+		interact_label.text = ""
+		touch.set_interact_available(false)
+
+
+func _on_kill_feed(killer: String, victim: String, weapon: String, headshot: bool, involves: int) -> void:
+	var row := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.45) if involves == 0 else (Color(0.5, 0.35, 0.05, 0.6) if involves > 0 else Color(0.45, 0.05, 0.05, 0.6))
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 2
+	sb.content_margin_bottom = 2
+	row.add_theme_stylebox_override("panel", sb)
+	var txt := "%s  [%s%s]  %s" % [killer if killer != "" else "", weapon, " HS" if headshot else "", victim]
+	if killer == "":
+		txt = "%s  [%s]" % [victim, weapon if weapon != "" else "Eliminated"]
+	var l := UITheme.label(txt, 16, UITheme.TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
+	row.add_child(l)
+	row.size_flags_horizontal = Control.SIZE_SHRINK_END
+	killfeed.add_child(row)
+	while killfeed.get_child_count() > 5:
+		killfeed.get_child(0).queue_free()
+		killfeed.remove_child(killfeed.get_child(0))
+	var rid := row.get_instance_id()
+	get_tree().create_timer(5.0, false).timeout.connect(func():
+		var o := instance_from_id(rid)
+		if o:
+			o.queue_free())
+
+
+func _on_player_kill(_victim: Actor, headshot: bool) -> void:
+	var s := player.streak
+	var names := {2: "DOUBLE KILL", 3: "TRIPLE KILL", 4: "FURY KILL", 5: "FRENZY", 7: "UNSTOPPABLE"}
+	streak_label.text = names.get(s, "HEADSHOT" if headshot else "ELIMINATED")
+	streak_t = 1.6
+
+
+func _process(delta: float) -> void:
+	if player == null:
+		return
+	announce_t -= delta
+	announce.visible = announce_t > 0.0
+	announce_sub.visible = announce_t > 0.0
+	streak_t -= delta
+	streak_label.visible = streak_t > 0.0
+	health_bar.value = player.health
+	health_label.text = str(ceili(player.health))
+	armor_bar.visible = player.max_armor > 0.0
+	armor_bar.max_value = maxf(player.max_armor, 1.0)
+	armor_bar.value = player.armor
+	var w := player.inv.active()
+	if w:
+		weapon_label.text = w.data.display_name
+		ammo_label.text = "%d / %d" % [w.mag, w.get_reserve()]
+		ammo_label.add_theme_color_override("font_color", UITheme.ENEMY if w.mag <= w.mag_size() * 0.2 else UITheme.TEXT)
+		reload_bar.visible = w.reloading
+		reload_bar.value = w.reload_progress() * 100.0
+	else:
+		weapon_label.text = "Unarmed"
+		ammo_label.text = "-"
+		reload_bar.visible = false
+	var parts: Array = []
+	if player.inv.lethal != "" and (player.inv.lethal_count > 0 or MatchConfig.mode != "br"):
+		parts.append("%s x%d" % [GameDB.EQUIPMENT[player.inv.lethal].name, player.inv.lethal_count])
+	if player.inv.tactical != "" and (player.inv.tactical_count > 0 or MatchConfig.mode != "br"):
+		parts.append("%s x%d" % [GameDB.EQUIPMENT[player.inv.tactical].name, player.inv.tactical_count])
+	if MatchConfig.mode == "br":
+		parts.append("Med %d  Band %d  Plate %d" % [player.inv.heals.get("medkit", 0), player.inv.heals.get("bandage", 0), player.inv.plates])
+	var eq := "   ".join(parts)
+	equip_label.text = eq
+	use_bar.visible = player.using_item != ""
+	if use_bar.visible:
+		use_bar.value = (1.0 - player.use_left / maxf(player.use_total, 0.01)) * 100.0
+	# Score / timer
+	if match_node.has_method("score_text"):
+		var st: Array = match_node.score_text()
+		score_a.text = str(st[0])
+		score_b.text = str(st[1])
+		var tl: float = match_node.time_left()
+		timer_label.text = "%d:%02d" % [int(tl) / 60, int(tl) % 60]
+		br_label.text = ""
+	else:
+		score_box.visible = false
+		if match_node.has_method("br_status"):
+			br_label.text = match_node.br_status()
+	# Death
+	death_panel.visible = not player.alive and not match_node.ended
+	if death_panel.visible:
+		var killer := player.death_cam_target
+		var who := killer.actor_name if killer and is_instance_valid(killer) and killer != player else "the zone"
+		death_label.text = "ELIMINATED BY %s" % who.to_upper()
+		if match_node.has_method("respawn_eta"):
+			death_label.text += "\nRespawning in %.1f" % match_node.respawn_eta(player)
+	hint_label.visible = not player.touch_mode and (match_node.elapsed < 25.0 or get_tree().paused)
+	hint_label.text = "WASD move  Mouse aim  LMB fire  RMB ADS  R reload  Q swap  Shift sprint  C crouch/slide  G/T grenades  V melee  F interact  H heal  X plate  M map  Tab scores  Esc pause"
+	fps_label.visible = SaveManager.get_setting("graphics", "show_fps", false)
+	if fps_label.visible:
+		fps_label.text = "FPS %d" % Engine.get_frames_per_second()
+	if scoreboard_panel.visible:
+		_refresh_scoreboard()
+
+
+func _refresh_scoreboard() -> void:
+	for c in scoreboard_list.get_children():
+		c.queue_free()
+	scoreboard_list.add_child(UITheme.label("%-18s %6s %6s %6s %7s" % ["OPERATOR", "K", "D", "A", "SCORE"], 18, UITheme.ACCENT))
+	for r in match_node.scoreboard():
+		var col := UITheme.ACCENT if r.is_player else (UITheme.FRIENDLY if r.team == player.team else UITheme.ENEMY)
+		if MatchConfig.mode != "tdm" and not r.is_player:
+			col = UITheme.TEXT
+		var l := UITheme.label("%-18s %6d %6d %6d %7d" % [r.name, r.kills, r.deaths, r.assists, r.score], 17, col if r.alive or MatchConfig.mode != "br" else UITheme.MUTED)
+		scoreboard_list.add_child(l)
