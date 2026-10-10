@@ -135,7 +135,7 @@ func _choice(parent: Control, sec: String, key: String, text: String, options: A
 
 func _controls_tab() -> void:
 	var v := _page("Controls")
-	_choice(v, "controls", "scheme", "Control scheme", [["auto", "Auto"], ["touch", "Touch"], ["keyboard", "Keyboard/Mouse"]], "Auto uses touch controls when a touchscreen is detected.")
+	_choice(v, "controls", "scheme", "Control scheme", [["auto", "Auto"], ["touch", "Touch"], ["keyboard", "Keyboard/Mouse"]], "Auto starts with touch controls when a touchscreen is detected, and switches live: touching the screen shows the on-screen controls, pressing a key or gamepad button switches to keyboard/mouse.")
 	_choice(v, "controls", "sprint_mode", "Sprint", [["auto", "Auto"], ["toggle", "Button only"]], "Auto: push the joystick fully forward to sprint. Drag past the top of the stick to lock sprint.")
 	_choice(v, "controls", "ads_mode", "Aim down sights", [["toggle", "Tap"], ["hold", "Hold"]])
 	_check(v, "controls", "invert_y", "Invert vertical look")

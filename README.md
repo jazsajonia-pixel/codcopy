@@ -37,6 +37,16 @@ Renderer: Mobile (Vulkan). On machines without Vulkan, run with `--rendering-dri
 
 ## Controls
 
+Settings > Controls > **Control scheme**: Auto (default), Touch or Keyboard/Mouse. Auto starts with touch controls
+when the device reports a touchscreen and then switches live: touching the screen shows the on-screen controls,
+pressing a keyboard key or gamepad button switches to keyboard/mouse (click the game window to lock the mouse for
+aiming).
+
+**If you can't move:** make sure you've pulled the latest `main` (the "no HUD / can't move" loading bug was fixed in
+commit `d4019a5`), click inside the game window so it has keyboard focus, and in Battle Royale press Space / JUMP to
+leave the aircraft first; you can't walk until you land. You can also set Control scheme to Keyboard/Mouse or Touch
+explicitly.
+
 ### Touch (default on touchscreen devices)
 - **Left side**: floating movement joystick. Push fully forward to auto-sprint; drag past the top to lock sprint.
 - **Right side**: drag anywhere empty to look. Dragging on **FIRE** or **ADS** also aims (fire-and-steer).

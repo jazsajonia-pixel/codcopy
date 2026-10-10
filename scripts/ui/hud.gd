@@ -350,6 +350,26 @@ func _input(event: InputEvent) -> void:
 		touch.visible = not get_tree().paused
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_layout()
+	# And the reverse: a physical keyboard key or gamepad button while in touch mode switches to
+	# keyboard/mouse controls (touchscreen laptops, tablets or phones with a keyboard or controller),
+	# unless the player explicitly chose Touch. Emulated mouse events from touches never switch modes.
+	elif player and player.touch_mode and not MatchConfig.autoplay_player \
+			and SaveManager.get_setting("controls", "scheme", "auto") != "touch" \
+			and ((event is InputEventKey and event.pressed and not event.echo) \
+				or (event is InputEventJoypadButton and event.pressed)):
+		set_keyboard_mode()
+
+
+## Switch the HUD and player to keyboard/mouse (or gamepad) controls.
+func set_keyboard_mode() -> void:
+	player.touch_mode = false
+	touch.release_all()
+	touch.visible = false
+	for l in [weapon_label, ammo_label, equip_label]:
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	if not get_tree().paused and DisplayServer.get_name() != "headless":
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_layout()
 
 
 func _unhandled_input(event: InputEvent) -> void:
