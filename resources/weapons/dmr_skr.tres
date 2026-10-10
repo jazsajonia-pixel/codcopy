@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "dmr_skr"
+display_name = "SKR Marksman"
+category = "SNIPER"
+description = "Semi-auto marksman rifle. Two shots to down."
+model_path = "res://assets/weapons/guns/Sniper_Rifle_East.glb"
+fire_mode = 1
+damage = 52.0
+headshot_multiplier = 1.8
+pellets = 1
+effective_range = 70.0
+max_range = 200.0
+falloff_multiplier = 0.8
+fire_rate_rpm = 260.0
+mag_size = 10
+reserve_ammo = 40
+reload_time = 2.6
+reload_empty_time = 3.2
+ads_time = 0.3
+move_speed_multiplier = 0.94
+ads_fov = 36.0
+scope_overlay = false
+hip_spread_deg = 5.0
+ads_spread_deg = 0.15
+move_spread_deg = 3.5
+spread_per_shot_deg = 0.4
+max_bloom_deg = 2.5
+recoil_vertical = 1.4
+recoil_horizontal = 0.3
+recoil_recovery = 8.0
+fire_sound = "res://assets/audio/weapons/ar_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "sniper"
+view_offset = Vector3(0.18, -0.16, -0.4)
+ads_offset = Vector3(0.0, -0.077, -0.3)
+unlock_level = 6
+allowed_attachments = { "optic": ["scope_4x", "scope_8x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

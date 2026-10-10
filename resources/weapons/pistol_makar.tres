@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "pistol_makar"
+display_name = "Makar .40"
+category = "PISTOL"
+description = "Compact high-caliber pistol."
+model_path = "res://assets/weapons/guns/Pistol_Compact_East.glb"
+fire_mode = 1
+damage = 36.0
+headshot_multiplier = 1.5
+pellets = 1
+effective_range = 12.0
+max_range = 40.0
+falloff_multiplier = 0.6
+fire_rate_rpm = 330.0
+mag_size = 8
+reserve_ammo = 48
+reload_time = 1.3
+reload_empty_time = 1.6
+ads_time = 0.11
+move_speed_multiplier = 1.08
+ads_fov = 70.0
+scope_overlay = false
+hip_spread_deg = 2.2
+ads_spread_deg = 0.55
+move_spread_deg = 1.0
+spread_per_shot_deg = 0.35
+max_bloom_deg = 2.2
+recoil_vertical = 1.2
+recoil_horizontal = 0.3
+recoil_recovery = 12.0
+fire_sound = "res://assets/audio/weapons/pistol_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_pistol.ogg"
+ammo_type = "pistol"
+view_offset = Vector3(0.14, -0.14, -0.31)
+ads_offset = Vector3(0.0, -0.082, -0.25)
+unlock_level = 4
+allowed_attachments = { "optic": ["red_dot"], "muzzle": ["suppressor", "compensator", "flash_guard"], "magazine": ["extended_mag", "fast_mag"] }

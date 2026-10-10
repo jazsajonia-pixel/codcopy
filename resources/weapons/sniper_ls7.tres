@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sniper_ls7"
+display_name = "LS-7 Longbow"
+category = "SNIPER"
+description = "Bolt-action. One-shot kill to the upper body."
+model_path = "res://assets/weapons/guns/Sniper_Rifle_West.glb"
+fire_mode = 2
+damage = 110.0
+headshot_multiplier = 2.0
+pellets = 1
+effective_range = 120.0
+max_range = 300.0
+falloff_multiplier = 0.85
+fire_rate_rpm = 45.0
+mag_size = 5
+reserve_ammo = 25
+reload_time = 3.0
+reload_empty_time = 3.6
+ads_time = 0.38
+move_speed_multiplier = 0.9
+ads_fov = 24.0
+scope_overlay = true
+hip_spread_deg = 8.0
+ads_spread_deg = 0.0
+move_spread_deg = 6.0
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 3.0
+recoil_horizontal = 0.5
+recoil_recovery = 5.0
+fire_sound = "res://assets/audio/weapons/sniper_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "sniper"
+view_offset = Vector3(0.18, -0.16, -0.42)
+ads_offset = Vector3(0.0, -0.075, -0.3)
+unlock_level = 1
+allowed_attachments = { "optic": ["scope_4x", "scope_8x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

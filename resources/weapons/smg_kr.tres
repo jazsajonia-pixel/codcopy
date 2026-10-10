@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "smg_kr"
+display_name = "Kestrel"
+category = "SMG"
+description = "Compact bullet hose. Highest fire rate in class."
+model_path = "res://assets/weapons/guns/SMG_Compact_West.glb"
+fire_mode = 0
+damage = 18.0
+headshot_multiplier = 1.25
+pellets = 1
+effective_range = 12.0
+max_range = 50.0
+falloff_multiplier = 0.5
+fire_rate_rpm = 1050.0
+mag_size = 40
+reserve_ammo = 200
+reload_time = 1.7
+reload_empty_time = 2.2
+ads_time = 0.15
+move_speed_multiplier = 1.05
+ads_fov = 66.0
+scope_overlay = false
+hip_spread_deg = 2.4
+ads_spread_deg = 0.7
+move_spread_deg = 1.2
+spread_per_shot_deg = 0.18
+max_bloom_deg = 2.6
+recoil_vertical = 0.5
+recoil_horizontal = 0.45
+recoil_recovery = 12.0
+fire_sound = "res://assets/audio/weapons/smg_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_pistol.ogg"
+ammo_type = "smg"
+view_offset = Vector3(0.15, -0.15, -0.31)
+ads_offset = Vector3(0.0, -0.064, -0.22)
+unlock_level = 5
+allowed_attachments = { "optic": ["red_dot", "holo"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "grip": ["vertical_grip", "angled_grip"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ar_m4k"
+display_name = "M4K Carbine"
+category = "AR"
+description = "Balanced 5.56 carbine. Reliable at every range."
+model_path = "res://assets/weapons/guns/Rifle_Assault_West.glb"
+fire_mode = 0
+damage = 26.0
+headshot_multiplier = 1.4
+pellets = 1
+effective_range = 32.0
+max_range = 110.0
+falloff_multiplier = 0.65
+fire_rate_rpm = 760.0
+mag_size = 30
+reserve_ammo = 150
+reload_time = 2.1
+reload_empty_time = 2.7
+ads_time = 0.22
+move_speed_multiplier = 0.97
+ads_fov = 58.0
+scope_overlay = false
+hip_spread_deg = 3.2
+ads_spread_deg = 0.35
+move_spread_deg = 2.2
+spread_per_shot_deg = 0.22
+max_bloom_deg = 3.0
+recoil_vertical = 0.75
+recoil_horizontal = 0.3
+recoil_recovery = 9.0
+fire_sound = "res://assets/audio/weapons/ar_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "rifle"
+view_offset = Vector3(0.17, -0.17, -0.36)
+ads_offset = Vector3(0.0, -0.076, -0.26)
+unlock_level = 1
+allowed_attachments = { "optic": ["red_dot", "holo", "scope_4x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "grip": ["vertical_grip", "angled_grip"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

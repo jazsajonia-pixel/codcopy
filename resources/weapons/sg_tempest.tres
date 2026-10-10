@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sg_tempest"
+display_name = "Tempest Auto"
+category = "SHOTGUN"
+description = "Semi-auto shotgun. Sustained close-range damage."
+model_path = "res://assets/weapons/guns/Shotgun_Auto_East.glb"
+fire_mode = 1
+damage = 11.0
+headshot_multiplier = 1.2
+pellets = 8
+effective_range = 6.0
+max_range = 20.0
+falloff_multiplier = 0.2
+fire_rate_rpm = 240.0
+mag_size = 8
+reserve_ammo = 32
+reload_time = 2.6
+reload_empty_time = 3.0
+ads_time = 0.22
+move_speed_multiplier = 0.98
+ads_fov = 66.0
+scope_overlay = false
+hip_spread_deg = 6.5
+ads_spread_deg = 5.0
+move_spread_deg = 1.0
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 1.6
+recoil_horizontal = 0.6
+recoil_recovery = 7.0
+fire_sound = "res://assets/audio/weapons/shotgun_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "shotgun"
+view_offset = Vector3(0.17, -0.15, -0.37)
+ads_offset = Vector3(0.0, -0.11, -0.27)
+unlock_level = 10
+allowed_attachments = { "optic": ["red_dot", "holo"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

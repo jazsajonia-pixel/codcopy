@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "lmg_rpv"
+display_name = "RPV Bulwark"
+category = "LMG"
+description = "Large magazine suppression weapon. Slow to aim."
+model_path = "res://assets/weapons/guns/Rifle_Battle_East.glb"
+fire_mode = 0
+damage = 30.0
+headshot_multiplier = 1.3
+pellets = 1
+effective_range = 40.0
+max_range = 130.0
+falloff_multiplier = 0.7
+fire_rate_rpm = 650.0
+mag_size = 60
+reserve_ammo = 180
+reload_time = 4.0
+reload_empty_time = 4.6
+ads_time = 0.34
+move_speed_multiplier = 0.88
+ads_fov = 56.0
+scope_overlay = false
+hip_spread_deg = 4.5
+ads_spread_deg = 0.55
+move_spread_deg = 3.0
+spread_per_shot_deg = 0.25
+max_bloom_deg = 4.0
+recoil_vertical = 0.9
+recoil_horizontal = 0.4
+recoil_recovery = 8.0
+fire_sound = "res://assets/audio/weapons/lmg_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "rifle"
+view_offset = Vector3(0.18, -0.16, -0.38)
+ads_offset = Vector3(0.0, -0.095, -0.28)
+unlock_level = 8
+allowed_attachments = { "optic": ["red_dot", "holo", "scope_4x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "grip": ["vertical_grip", "angled_grip"], "magazine": ["extended_mag", "fast_mag"] }

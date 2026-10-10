@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ar_k47"
+display_name = "KV-47"
+category = "AR"
+description = "Hard-hitting 7.62 rifle with heavy kick."
+model_path = "res://assets/weapons/guns/Rifle_Assault_East.glb"
+fire_mode = 0
+damage = 33.0
+headshot_multiplier = 1.45
+pellets = 1
+effective_range = 35.0
+max_range = 120.0
+falloff_multiplier = 0.7
+fire_rate_rpm = 600.0
+mag_size = 30
+reserve_ammo = 150
+reload_time = 2.3
+reload_empty_time = 2.9
+ads_time = 0.25
+move_speed_multiplier = 0.95
+ads_fov = 58.0
+scope_overlay = false
+hip_spread_deg = 3.6
+ads_spread_deg = 0.45
+move_spread_deg = 2.4
+spread_per_shot_deg = 0.3
+max_bloom_deg = 3.6
+recoil_vertical = 1.05
+recoil_horizontal = 0.45
+recoil_recovery = 8.0
+fire_sound = "res://assets/audio/weapons/ar_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "rifle"
+view_offset = Vector3(0.17, -0.16, -0.36)
+ads_offset = Vector3(0.0, -0.088, -0.26)
+unlock_level = 3
+allowed_attachments = { "optic": ["red_dot", "holo", "scope_4x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "grip": ["vertical_grip", "angled_grip"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

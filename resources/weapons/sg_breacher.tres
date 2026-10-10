@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sg_breacher"
+display_name = "Breacher 12"
+category = "SHOTGUN"
+description = "Pump-action. One-shot potential up close."
+model_path = "res://assets/weapons/guns/Shotgun_Pump_West.glb"
+fire_mode = 3
+damage = 16.0
+headshot_multiplier = 1.2
+pellets = 8
+effective_range = 7.0
+max_range = 22.0
+falloff_multiplier = 0.2
+fire_rate_rpm = 75.0
+mag_size = 6
+reserve_ammo = 30
+reload_time = 3.0
+reload_empty_time = 3.6
+ads_time = 0.2
+move_speed_multiplier = 1.0
+ads_fov = 66.0
+scope_overlay = false
+hip_spread_deg = 6.0
+ads_spread_deg = 4.5
+move_spread_deg = 1.0
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 2.4
+recoil_horizontal = 0.6
+recoil_recovery = 6.0
+fire_sound = "res://assets/audio/weapons/shotgun_shot.ogg"
+reload_sound = "res://assets/audio/weapons/shotgun_pump.ogg"
+ammo_type = "shotgun"
+view_offset = Vector3(0.17, -0.15, -0.36)
+ads_offset = Vector3(0.0, -0.07, -0.27)
+unlock_level = 2
+allowed_attachments = { "optic": ["red_dot", "holo"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "pistol_p9"
+display_name = "P9 Sidearm"
+category = "PISTOL"
+description = "Dependable 9mm sidearm."
+model_path = "res://assets/weapons/guns/Pistol_Full_West.glb"
+fire_mode = 1
+damage = 28.0
+headshot_multiplier = 1.5
+pellets = 1
+effective_range = 15.0
+max_range = 50.0
+falloff_multiplier = 0.6
+fire_rate_rpm = 420.0
+mag_size = 15
+reserve_ammo = 75
+reload_time = 1.4
+reload_empty_time = 1.7
+ads_time = 0.12
+move_speed_multiplier = 1.08
+ads_fov = 70.0
+scope_overlay = false
+hip_spread_deg = 2.0
+ads_spread_deg = 0.5
+move_spread_deg = 1.0
+spread_per_shot_deg = 0.3
+max_bloom_deg = 2.0
+recoil_vertical = 0.9
+recoil_horizontal = 0.25
+recoil_recovery = 12.0
+fire_sound = "res://assets/audio/weapons/pistol_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_pistol.ogg"
+ammo_type = "pistol"
+view_offset = Vector3(0.14, -0.14, -0.32)
+ads_offset = Vector3(0.0, -0.085, -0.25)
+unlock_level = 1
+allowed_attachments = { "optic": ["red_dot"], "muzzle": ["suppressor", "compensator", "flash_guard"], "magazine": ["extended_mag", "fast_mag"] }
