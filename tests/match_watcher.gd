@@ -11,6 +11,7 @@ var m: Node
 var max_bot_travel := 0.0
 var bot_start := {}
 var player_had_weapon := false
+var player_shots := 0
 var player_landed := false
 var zone_phases := 0
 var min_alive := 999
@@ -72,6 +73,7 @@ func _observe() -> void:
 		max_bot_travel = maxf(max_bot_travel, b.global_position.distance_to(bot_start[b]))
 	if m.player.inv.has_any_weapon():
 		player_had_weapon = true
+	player_shots = maxi(player_shots, m.player.shots_fired)
 	if mode == "br":
 		if m.player_dropped and m.player.parachute_state == 0 and m.player.is_on_floor():
 			player_landed = true
@@ -109,7 +111,7 @@ func _on_results() -> void:
 			for row in r.get("scoreboard", []):
 				top = maxi(top, int(row.kills))
 		check(top >= MatchConfig.score_limit or float(r.get("duration", 0)) >= MatchConfig.time_limit - 1.0, "match ended by score or time limit")
-		check(int(r.get("kills", 0)) + int(r.get("deaths", 0)) > 0, "player participated in combat")
+		check(player_shots > 0 and int(r.get("kills", 0)) + int(r.get("deaths", 0)) + int(r.get("assists", 0)) > 0, "player fought (%d shots, K/D/A %d/%d/%d)" % [player_shots, r.get("kills", 0), r.get("deaths", 0), r.get("assists", 0)])
 	if mode == "br":
 		check(player_landed, "player deployed and landed")
 		check(player_had_weapon, "player looted a weapon")

@@ -83,6 +83,9 @@ func _process(delta: float) -> void:
 		var p: String = dir.path_join(shots[idx][1] + ".png")
 		img.save_png(p)
 		print("SHOT ", p)
+		var cs := get_tree().current_scene
+		if cs and cs.get("chute_mesh"):
+			print("  chute_vis=", cs.chute_mesh.visible, " state=", cs.player.parachute_state, " zone_vis=", cs.zone_wall.visible, " phase=", cs.phase, " r=", cs.zone.radius, " pos=", cs.player.global_position)
 		idx += 1
 		if idx >= shots.size():
 			get_tree().quit()
