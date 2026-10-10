@@ -315,8 +315,14 @@ func _update_zone_visual() -> void:
 	zone_wall.visible = phase == Phase.ACTIVE and player.parachute_state != 1
 	zone_wall.global_position = Vector3(zone.center.x, 40.0, zone.center.y)
 	zone_wall.scale = Vector3(maxf(zone.radius, 0.1), 160.0, maxf(zone.radius, 0.1))
-	var outside := zone.is_outside(Vector2(player.global_position.x, player.global_position.z))
-	zone_mat.albedo_color = Color(1.0, 0.3, 0.2, 0.3) if outside else Color(0.25, 0.55, 1.0, 0.22)
+	var pp := Vector2(player.global_position.x, player.global_position.z)
+	var edge := zone.radius - pp.distance_to(zone.center)
+	if edge < 0.0:
+		zone_mat.albedo_color = Color(1.0, 0.3, 0.2, 0.35)
+	else:
+		# Fade the wall in as the player approaches it so it doesn't tint the whole sky.
+		zone_mat.albedo_color = Color(0.25, 0.55, 1.0, 0.3 * clampf(1.0 - edge / 60.0, 0.0, 1.0))
+	zone_wall.visible = zone_wall.visible and zone_mat.albedo_color.a > 0.01
 
 
 func _on_zone_phase(index: int, shrinking: bool) -> void:
