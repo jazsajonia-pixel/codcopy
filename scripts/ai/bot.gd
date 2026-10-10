@@ -1,0 +1,558 @@
+class_name Bot
+extends Actor
+## Reusable AI soldier for Multiplayer and Battle Royale.
+## Perception: distance + field of view + line of sight (+ smoke) + hearing unsuppressed shots.
+## Behaviour: patrol -> investigate -> engage (strafe/advance) -> retreat to cover at low HP.
+## BR extras: parachute descent, loot seeking, healing, safe-zone awareness.
+
+enum State { PATROL, INVESTIGATE, ENGAGE, RETREAT, LOOT, ZONE, PARACHUTE, HEAL }
+
+const NAMES := ["Hawk", "Bravo", "Kodiak", "Sable", "Rook", "Mako", "Jinx", "Talon", "Brick", "Dusk",
+	"Fang", "Grit", "Havoc", "Ivory", "Jolt", "Karma", "Lotus", "Maverick", "Nomad", "Onyx", "Pike",
+	"Quill", "Ronin", "Spectre", "Tusk", "Umbra", "Vandal", "Wraith", "Yeti", "Zulu", "Cinder", "Banshee"]
+
+var state := State.PATROL
+var diff := {}
+var agent: NavigationAgent3D
+var model: Node3D
+var anim: AnimationPlayer
+var gun_holder: Node3D
+var gun_model: Node3D
+var name_tag: Label3D
+var aim_dir := Vector3.FORWARD
+var target: Actor = null
+var last_known := Vector3.ZERO
+var last_seen_t := 99.0
+var reaction_left := 0.0
+var aim_error := Vector3.ZERO
+var aim_error_t := 0.0
+var tracking_t := 0.0
+var burst_left := 0.0
+var burst_pause := 0.0
+var strafe_dir := 1.0
+var strafe_t := 0.0
+var think_t := 0.0
+var repath_t := 0.0
+var move_goal := Vector3.ZERO
+var stuck_t := 0.0
+var last_pos := Vector3.ZERO
+var retreat_t := 0.0
+var grenade_t := 6.0
+var crouch_t := 0.0
+var cur_anim := ""
+var match_node: Node = null   ## MP/BR match manager (provides patrol points / zone info)
+var br_mode := false
+var parachute := false
+var drop_target := Vector3.ZERO
+var loot_target: Node3D = null
+var step_accum := 0.0
+var _rng := RandomNumberGenerator.new()
+var _ignored_loot := {}
+
+
+func parachute_active() -> bool:
+	return parachute
+
+
+func setup(p_name: String, p_team: int, p_operator: String, p_diff: Dictionary) -> void:
+	actor_name = p_name
+	team = p_team
+	operator_id = p_operator
+	diff = p_diff
+
+
+func _ready() -> void:
+	super._ready()
+	_rng.randomize()
+	think_t = _rng.randf() * 0.25
+	agent = NavigationAgent3D.new()
+	agent.path_desired_distance = 1.0
+	agent.target_desired_distance = 1.2
+	agent.radius = RADIUS
+	agent.height = HEIGHT
+	agent.avoidance_enabled = false
+	agent.path_max_distance = 4.0
+	add_child(agent)
+	var op := GameDB.get_operator(operator_id)
+	model = load(op.model).instantiate()
+	model.scale = Vector3.ONE * 2.65
+	model.rotation.y = PI
+	add_child(model)
+	anim = model.find_child("AnimationPlayer", true, false)
+	if anim:
+		for a in ["idle", "walk", "sprint", "holding-both", "holding-both-shoot", "crouch", "fall"]:
+			if anim.has_animation(a):
+				anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
+	for m in model.find_children("*", "GeometryInstance3D", true, false):
+		var gi := m as GeometryInstance3D
+		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if SaveManager.get_setting("graphics", "effects_quality", 1) >= 1 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# Distance culling keeps far bots cheap on mobile.
+		gi.visibility_range_end = 220.0
+	gun_holder = Node3D.new()
+	gun_holder.position = Vector3(0.12, 1.12, 0.0)
+	add_child(gun_holder)
+	name_tag = Label3D.new()
+	name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	name_tag.no_depth_test = false
+	name_tag.font_size = 40
+	name_tag.pixel_size = 0.006
+	name_tag.outline_size = 8
+	name_tag.position.y = 2.15
+	name_tag.text = actor_name
+	add_child(name_tag)
+	_refresh_gun_model()
+	inv.changed.connect(_refresh_gun_model)
+	last_pos = global_position
+
+
+func _refresh_gun_model() -> void:
+	var w := inv.active()
+	if gun_model:
+		gun_model.queue_free()
+		gun_model = null
+	if w == null:
+		return
+	gun_model = load(w.data.model_path).instantiate()
+	gun_model.position = Vector3(0, 0, -0.32)
+	gun_holder.add_child(gun_model)
+
+
+func set_tag_style(friendly: bool, visible_to_player: bool) -> void:
+	if friendly:
+		name_tag.modulate = Color(0.45, 0.75, 1.0)
+		name_tag.visible = alive
+	else:
+		name_tag.modulate = _enemy_color()
+		name_tag.visible = alive and visible_to_player
+
+
+static func _enemy_color() -> Color:
+	match SaveManager.get_setting("accessibility", "enemy_color", "red"):
+		"orange": return Color(1.0, 0.55, 0.1)
+		"magenta": return Color(1.0, 0.2, 0.85)
+	return Color(1.0, 0.25, 0.2)
+
+
+func look_dir() -> Vector3:
+	return aim_dir
+
+
+func muzzle_pos() -> Vector3:
+	return gun_holder.global_position + aim_dir * 0.6
+
+
+# ---------------- Loop ----------------
+
+func _physics_process(delta: float) -> void:
+	tick_common(delta)
+	if not alive:
+		return
+	if parachute:
+		_parachute(delta)
+		return
+	think_t -= delta
+	if think_t <= 0.0:
+		think_t = 0.2 + _rng.randf() * 0.08
+		_think()
+	_update_aim(delta)
+	_act(delta)
+	_move(delta)
+	_animate()
+
+
+func _think() -> void:
+	_perceive()
+	var w := inv.active()
+	if br_mode and match_node and match_node.has_method("outside_zone") and match_node.outside_zone(global_position, 0.85):
+		if target == null or health < 50.0:
+			state = State.ZONE
+			return
+	if target:
+		if health < max_health * 0.35 and retreat_t <= 0.0 and _rng.randf() < 0.5 + (1.0 - diff.get("aggression", 0.6)) * 0.4:
+			state = State.RETREAT
+			retreat_t = 3.5
+			move_goal = _find_cover(target.global_position)
+			return
+		if state != State.RETREAT or retreat_t <= 0.0:
+			state = State.ENGAGE
+		return
+	if br_mode and health < 70.0 and inv.best_heal() != "" and using_item == "":
+		state = State.HEAL
+		start_use(inv.best_heal())
+		return
+	if br_mode and armor < max_armor and inv.plates > 0 and using_item == "":
+		start_use("plate")
+	if w and w.mag < w.mag_size() * 0.5 and not w.reloading:
+		request_reload()
+	if br_mode:
+		var lt := _find_loot()
+		if lt:
+			loot_target = lt
+			state = State.LOOT
+			return
+	if last_seen_t < 8.0:
+		state = State.INVESTIGATE
+		return
+	if state != State.PATROL or global_position.distance_to(move_goal) < 2.0 or move_goal == Vector3.ZERO:
+		state = State.PATROL
+		move_goal = _patrol_point()
+
+
+func _perceive() -> void:
+	var best: Actor = null
+	var best_score := INF
+	var eye := eye_position()
+	var fwd := aim_dir
+	var fov_cos := cos(deg_to_rad(diff.get("fov_deg", 115.0) * 0.5))
+	var view: float = diff.get("view_dist", 60.0)
+	var space := get_world_3d().direct_space_state
+	for n in get_tree().get_nodes_in_group("actors"):
+		var a: Actor = n
+		if not a.alive or not a.visible or not is_enemy(a) or a.parachute_active():
+			continue
+		var to := a.aim_point() - eye
+		var dist := to.length()
+		if dist > view:
+			continue
+		var in_fov := fwd.dot(to / dist) > fov_cos or dist < 4.0 or (a == target and last_seen_t < 1.0)
+		if not in_fov:
+			continue
+		var q := PhysicsRayQueryParameters3D.create(eye, a.aim_point(), 1)
+		if not space.intersect_ray(q).is_empty():
+			var q2 := PhysicsRayQueryParameters3D.create(eye, a.head_point(), 1)
+			if not space.intersect_ray(q2).is_empty():
+				continue
+		if Effects.blocked_by_smoke(eye, a.aim_point()):
+			continue
+		var s := dist * (0.5 if a == target else 1.0)
+		if s < best_score:
+			best_score = s
+			best = a
+	if best:
+		if best != target:
+			reaction_left = diff.get("reaction", 0.5) * _rng.randf_range(0.8, 1.25) * (1.0 + flash_time)
+			tracking_t = 0.0
+		target = best
+		last_known = best.global_position
+		last_seen_t = 0.0
+	else:
+		if target:
+			last_known = target.global_position if target.alive else last_known
+		target = null
+		last_seen_t += 0.2
+
+
+## Called by the match when an unsuppressed shot or explosion is heard nearby.
+func hear(source: Actor) -> void:
+	if target == null and is_enemy(source) and source.alive:
+		last_known = source.global_position
+		last_seen_t = 0.5
+		var to := (source.global_position - global_position)
+		to.y = 0
+		if to.length() > 0.1:
+			aim_dir = aim_dir.slerp(to.normalized(), 0.6).normalized()
+
+
+func _on_damaged_by(attacker: Actor) -> void:
+	if attacker and attacker.alive and target == null:
+		last_known = attacker.global_position
+		last_seen_t = 0.2
+		var to := attacker.global_position - global_position
+		to.y = 0
+		if to.length() > 0.1:
+			aim_dir = to.normalized()
+
+
+func take_damage(amount: float, attacker: Actor, weapon_name: String = "", headshot: bool = false, from_pos: Vector3 = Vector3.ZERO) -> bool:
+	var killed := super.take_damage(amount, attacker, weapon_name, headshot, from_pos)
+	if not killed:
+		_on_damaged_by(attacker)
+	return killed
+
+
+func _update_aim(delta: float) -> void:
+	var desired := aim_dir
+	if target and target.alive:
+		tracking_t += delta
+		aim_error_t -= delta
+		if aim_error_t <= 0.0:
+			aim_error_t = 0.35
+			var err: float = diff.get("aim_error_deg", 3.0) * (1.0 + flash_time * 3.0) / (1.0 + tracking_t * 0.6)
+			var dist := global_position.distance_to(target.global_position)
+			# Angular error shrinks slightly with distance so bots stay beatable at range and up close.
+			aim_error = Vector3(_rng.randf_range(-1, 1), _rng.randf_range(-0.6, 0.6), _rng.randf_range(-1, 1)) * tan(deg_to_rad(err)) * dist
+		var pt := target.aim_point() + aim_error
+		if target.velocity.length() > 0.5:
+			pt += target.velocity * 0.05
+		desired = (pt - eye_position()).normalized()
+	elif velocity.length() > 0.5:
+		desired = Vector3(velocity.x, 0, velocity.z).normalized()
+	var speed: float = diff.get("track_speed", 5.0) if target else 4.0
+	aim_dir = aim_dir.slerp(desired, clampf(delta * speed, 0, 1)).normalized()
+	var flat := Vector3(aim_dir.x, 0, aim_dir.z)
+	if flat.length() > 0.05:
+		rotation.y = atan2(-flat.x, -flat.z)
+	gun_holder.rotation.x = asin(clampf(aim_dir.y, -1, 1))
+
+
+func _act(delta: float) -> void:
+	reaction_left -= delta
+	grenade_t -= delta
+	retreat_t -= delta
+	crouch_t -= delta
+	var w := inv.active()
+	var fire := false
+	if target and target.alive and w and reaction_left <= 0.0 and flash_time < 0.4 and using_item == "":
+		var to := (target.aim_point() - eye_position())
+		var dist := to.length()
+		var aligned := aim_dir.dot(to.normalized()) > cos(deg_to_rad(6.0 + 60.0 / maxf(dist, 1.0)))
+		if dist <= float(w.stats.max_range) * 0.9 and aligned:
+			if burst_left > 0.0:
+				burst_left -= delta
+				fire = true
+			else:
+				burst_pause -= delta
+				if burst_pause <= 0.0:
+					var b: float = diff.get("burst", 0.55)
+					burst_left = _rng.randf_range(0.25, 0.7) * (0.5 + b) * (1.6 if dist < 15.0 else 1.0)
+					burst_pause = _rng.randf_range(0.2, 0.55) * (1.5 - b) * (1.0 + dist / 60.0)
+		# Occasional grenade at mid range.
+		if grenade_t <= 0.0 and dist > 9.0 and dist < 24.0 and inv.lethal_count > 0:
+			grenade_t = _rng.randf_range(10.0, 20.0)
+			if _rng.randf() < 0.35:
+				var arc := (target.global_position - global_position)
+				var throw_dir := (arc.normalized() + Vector3.UP * clampf(dist / 40.0, 0.1, 0.6)).normalized()
+				throw_dir = throw_dir * clampf(dist / 20.0, 0.5, 1.2)
+				throw_equipment("lethal", eye_position(), throw_dir.normalized())
+		# Mid-fight crouch for variety.
+		if crouch_t <= 0.0:
+			crouch_t = _rng.randf_range(2.0, 5.0)
+			set_height(CROUCH_HEIGHT if _rng.randf() < 0.25 and dist > 12.0 else HEIGHT)
+	elif current_height < HEIGHT and crouch_t <= 0.0:
+		set_height(HEIGHT)
+	if w and w.mag == 0 and not w.reloading:
+		request_reload()
+	var wdir := aim_dir
+	if fire:
+		# Pistol/semi weapons: pulse the trigger.
+		if w.data.fire_mode != WeaponData.FireMode.AUTO and Engine.get_physics_frames() % 2 == 0:
+			fire = false
+	process_trigger(fire, eye_position(), wdir, muzzle_pos(), true, velocity.length() > 1.0)
+	# In BR, swap to the other weapon if the active one is dry.
+	if w and w.mag == 0 and w.get_reserve() == 0:
+		inv.cycle()
+
+
+func _move(delta: float) -> void:
+	var speed := 4.6
+	var goal := Vector3.ZERO
+	var has_goal := true
+	match state:
+		State.ENGAGE:
+			if target:
+				var dist := global_position.distance_to(target.global_position)
+				strafe_t -= delta
+				if strafe_t <= 0.0:
+					strafe_t = _rng.randf_range(0.6, 1.6)
+					strafe_dir = -strafe_dir if _rng.randf() < 0.7 else strafe_dir
+				var side := aim_dir.cross(Vector3.UP).normalized() * strafe_dir
+				var w := inv.active()
+				var ideal: float = clampf(float(w.stats.effective_range) * 0.6, 6.0, 30.0) if w else 10.0
+				var push := 0.0
+				if dist > ideal * (1.4 - diff.get("aggression", 0.6) * 0.5):
+					push = 1.0
+				elif dist < ideal * 0.4:
+					push = -0.6
+				goal = global_position + side * 2.5 + Vector3(aim_dir.x, 0, aim_dir.z).normalized() * push * 3.0
+				speed = 3.6
+			else:
+				has_goal = false
+		State.RETREAT:
+			goal = move_goal
+			speed = 6.2
+			if global_position.distance_to(move_goal) < 1.5:
+				retreat_t = 0.0
+		State.INVESTIGATE:
+			goal = last_known
+			speed = 4.8
+			if global_position.distance_to(last_known) < 2.0:
+				last_seen_t = 99.0
+		State.PATROL:
+			goal = move_goal
+			speed = 4.0
+		State.LOOT:
+			if loot_target and is_instance_valid(loot_target) and loot_target.is_inside_tree():
+				goal = loot_target.global_position
+				speed = 5.6
+				if global_position.distance_to(goal) < 1.6:
+					loot_target.interact(self)
+					if is_instance_valid(loot_target):
+						_ignored_loot[loot_target] = true
+					loot_target = null
+					state = State.PATROL
+			else:
+				loot_target = null
+				state = State.PATROL
+				has_goal = false
+		State.ZONE:
+			goal = match_node.zone_target() if match_node and match_node.has_method("zone_target") else move_goal
+			speed = 6.6
+		State.HEAL:
+			has_goal = false
+			if using_item == "":
+				state = State.PATROL
+	var dir := Vector3.ZERO
+	if has_goal:
+		repath_t -= delta
+		if repath_t <= 0.0 or agent.target_position.distance_to(goal) > 2.0:
+			repath_t = 0.5
+			agent.target_position = goal
+		var next := agent.get_next_path_position()
+		dir = next - global_position
+		dir.y = 0
+		if dir.length() < 0.2 or agent.is_navigation_finished():
+			dir = goal - global_position
+			dir.y = 0
+		if dir.length() > 0.15:
+			dir = dir.normalized()
+		else:
+			dir = Vector3.ZERO
+	if using_item != "":
+		speed *= 0.5
+	var w2 := inv.active()
+	if w2:
+		speed *= float(w2.stats.move_speed_multiplier)
+	if current_height < HEIGHT:
+		speed *= 0.55
+	var hv := Vector3(velocity.x, 0, velocity.z).lerp(dir * speed, clampf(delta * 10.0, 0, 1))
+	velocity.x = hv.x
+	velocity.z = hv.z
+	if not is_on_floor():
+		velocity.y -= GRAVITY * delta
+	move_and_slide()
+	# Stuck detection: jump, then pick a new goal.
+	if has_goal and dir != Vector3.ZERO:
+		if global_position.distance_to(last_pos) < 0.6 * delta * 10.0:
+			stuck_t += delta
+		else:
+			stuck_t = 0.0
+		if stuck_t > 1.2:
+			if is_on_floor():
+				velocity.y = 6.5
+			stuck_t = 0.0
+			if state == State.PATROL:
+				move_goal = _patrol_point()
+			strafe_dir = -strafe_dir
+	last_pos = global_position
+	if is_on_floor() and hv.length() > 1.5:
+		step_accum += hv.length() * delta
+		if step_accum > 2.2:
+			step_accum = 0.0
+			AudioManager.play_3d("res://assets/audio/footsteps/footstep_grass_00%d.ogg" % (randi() % 5), global_position, -10.0, randf_range(0.9, 1.1), 22.0)
+
+
+func _animate() -> void:
+	if anim == null:
+		return
+	var hs := Vector2(velocity.x, velocity.z).length()
+	var a := "idle"
+	if not is_on_floor():
+		a = "fall"
+	elif current_height < HEIGHT:
+		a = "crouch"
+	elif state == State.ENGAGE and inv.active() and hs < 4.0:
+		a = "holding-both-shoot" if burst_left > 0.0 else "holding-both"
+	elif hs > 5.2:
+		a = "sprint"
+	elif hs > 0.6:
+		a = "walk"
+	if a != cur_anim and anim.has_animation(a):
+		cur_anim = a
+		anim.play(a, 0.15)
+
+
+func _on_died() -> void:
+	name_tag.visible = false
+	if anim and anim.has_animation("die"):
+		cur_anim = "die"
+		anim.play("die", 0.1)
+	target = null
+	if gun_model:
+		gun_model.visible = false
+
+
+func _on_respawned() -> void:
+	state = State.PATROL
+	move_goal = _patrol_point()
+	target = null
+	last_seen_t = 99.0
+	cur_anim = ""
+	set_height(HEIGHT)
+	if gun_model:
+		gun_model.visible = true
+
+
+# ---------------- Helpers ----------------
+
+func _patrol_point() -> Vector3:
+	if match_node and match_node.has_method("random_patrol_point"):
+		return match_node.random_patrol_point(self)
+	var m := get_world_3d().navigation_map
+	return NavigationServer3D.map_get_random_point(m, 1, false)
+
+
+## Picks a nearby point that is hidden from `threat` (chest height ray blocked by world geometry).
+func _find_cover(threat: Vector3) -> Vector3:
+	var space := get_world_3d().direct_space_state
+	var away := (global_position - threat)
+	away.y = 0
+	away = away.normalized() if away.length() > 0.1 else Vector3.FORWARD
+	var m := get_world_3d().navigation_map
+	var best := global_position + away * 8.0
+	for i in 10:
+		var ang := _rng.randf_range(-1.6, 1.6)
+		var cand := global_position + away.rotated(Vector3.UP, ang) * _rng.randf_range(5.0, 11.0)
+		cand = NavigationServer3D.map_get_closest_point(m, cand)
+		var q := PhysicsRayQueryParameters3D.create(threat + Vector3.UP * 1.5, cand + Vector3.UP * 1.1, 1)
+		if not space.intersect_ray(q).is_empty():
+			return cand
+	return best
+
+
+func _find_loot() -> Node3D:
+	var w := inv.active()
+	var needs_weapon := w == null or (w.data.category == "PISTOL" and inv.weapons[0] != null and inv.weapons[1] == null) or not inv.has_any_weapon()
+	var needs_armor := armor_tier < 2
+	var best: Node3D = null
+	var best_d := 45.0 if needs_weapon else 22.0
+	for n in get_tree().get_nodes_in_group("loot"):
+		var l := n as Node3D
+		if l == null or not l.visible or _ignored_loot.has(l):
+			continue
+		var kind: String = l.get("kind")
+		var useful: bool = (kind == "weapon" and needs_weapon) or (kind == "armor" and needs_armor and int(l.get("tier")) > armor_tier) \
+			or (kind == "ammo" and w != null and l.get("item_id") == "ammo_" + w.data.ammo_type and inv.get_ammo(w.data.ammo_type) < w.mag_size() * 3) or (kind == "heal" and inv.best_heal() == "") or (kind == "plate" and inv.plates < 2) or kind == "crate"
+		if not useful:
+			continue
+		var d := global_position.distance_to(l.global_position)
+		if d < best_d:
+			best_d = d
+			best = l
+	return best
+
+
+func _parachute(delta: float) -> void:
+	var to := drop_target - global_position
+	to.y = 0
+	var hv := Vector3.ZERO
+	if to.length() > 2.0:
+		hv = to.normalized() * 12.0
+	velocity = Vector3(hv.x, -7.0, hv.z)
+	move_and_slide()
+	if anim and cur_anim != "fall" and anim.has_animation("fall"):
+		cur_anim = "fall"
+		anim.play("fall")
+	if is_on_floor():
+		parachute = false
+		state = State.PATROL
+		move_goal = global_position
