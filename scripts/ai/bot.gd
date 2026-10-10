@@ -48,7 +48,17 @@ var loot_target: Node3D = null
 var step_accum := 0.0
 var _rng := RandomNumberGenerator.new()
 var _ignored_loot := {}
-var leader: Actor = null          ## squad leader to stay near (the player's AI teammates)
+var leader: Actor = null
+## Network puppet (LAN matches): AI is off; position/aim come from the network.
+var puppet := false
+var net: NetSync = null
+var _net_pos := Vector3.ZERO
+var _net_vel := Vector3.ZERO
+var _net_yaw := 0.0
+var _net_pitch := 0.0
+var _net_floor := true
+var _net_weapon := ""
+var _net_has := false          ## squad leader to stay near (the player's AI teammates)
 var revive_mate: Actor = null
 var _revive_near_t := 0.0     ## time spent close to the downed mate (widens reach if navigation can't get closer)
 var mount_vehicle: Vehicle = null
@@ -148,6 +158,9 @@ func muzzle_pos() -> Vector3:
 # ---------------- Loop ----------------
 
 func _physics_process(delta: float) -> void:
+	if puppet:
+		_puppet_update(delta)
+		return
 	tick_common(delta)
 	if not alive:
 		return
@@ -299,10 +312,64 @@ func _on_damaged_by(attacker: Actor) -> void:
 
 
 func take_damage(amount: float, attacker: Actor, weapon_name: String = "", headshot: bool = false, from_pos: Vector3 = Vector3.ZERO) -> bool:
+	if puppet and net:
+		if not alive or invulnerable_time > 0.0 or (attacker and attacker != self and not attacker.is_enemy(self)):
+			return false
+		if net.is_host():
+			return host_apply_damage(amount, attacker, weapon_name, headshot, from_pos)
+		# Client: the host owns this actor's health. Report the hit and show local feedback only.
+		net.report_hit(self, amount, attacker, weapon_name, headshot, from_pos)
+		if attacker and attacker != self:
+			attacker.hit_confirmed.emit(headshot, false)
+		return false
 	var killed := super.take_damage(amount, attacker, weapon_name, headshot, from_pos)
 	if not killed:
 		_on_damaged_by(attacker)
 	return killed
+
+
+## Host only: apply authoritative damage to a remote player's puppet and tell its owner.
+func host_apply_damage(amount: float, attacker: Actor, weapon_name: String, headshot: bool, from_pos: Vector3) -> bool:
+	var killed := super.take_damage(amount, attacker, weapon_name, headshot, from_pos)
+	if net and not killed:
+		net.host_notify_damage(self, from_pos, attacker)
+	return killed
+
+
+func net_apply(pos: Vector3, yaw: float, pitch: float, vel: Vector3, weapon_id: String, height: float, on_floor: bool) -> void:
+	_net_pos = pos
+	_net_yaw = yaw
+	_net_pitch = pitch
+	_net_vel = vel
+	_net_floor = on_floor
+	if not _net_has or global_position.distance_to(pos) > 8.0:
+		global_position = pos
+	_net_has = true
+	if absf(height - current_height) > 0.05:
+		set_height(height)
+	if weapon_id != _net_weapon and weapon_id != "":
+		_net_weapon = weapon_id
+		inv.load_from_loadout({"primary": weapon_id, "secondary": "pistol_p9", "melee": "knife", "lethal": "frag", "tactical": "smoke"})
+		_refresh_gun_model()
+
+
+func _puppet_update(delta: float) -> void:
+	if invulnerable_time > 0.0:
+		invulnerable_time -= delta
+	if not alive or not _net_has:
+		return
+	# Host-side health regen for remote players (the host owns their health).
+	if net and net.is_host() and regen_enabled:
+		_since_damage += delta
+		if _since_damage > regen_delay and health < max_health:
+			health = minf(max_health, health + regen_rate * delta)
+	var target_pos := _net_pos + _net_vel * 0.05
+	global_position = global_position.lerp(target_pos, clampf(delta * 14.0, 0.0, 1.0))
+	rotation.y = lerp_angle(rotation.y, _net_yaw, clampf(delta * 16.0, 0.0, 1.0))
+	aim_dir = Vector3(-sin(rotation.y) * cos(_net_pitch), sin(_net_pitch), -cos(rotation.y) * cos(_net_pitch))
+	gun_holder.rotation.x = _net_pitch
+	velocity = _net_vel
+	_animate()
 
 
 func _update_aim(delta: float) -> void:
@@ -536,11 +603,11 @@ func _animate() -> void:
 		return
 	var hs := Vector2(velocity.x, velocity.z).length()
 	var a := "idle"
-	if not is_on_floor():
+	if not (_net_floor if puppet else is_on_floor()):
 		a = "fall"
 	elif current_height < HEIGHT:
 		a = "crouch"
-	elif state == State.ENGAGE and inv.active() and hs < 4.0:
+	elif (state == State.ENGAGE or puppet) and inv.active() and hs < 4.0:
 		a = "holding-both-shoot" if burst_left > 0.0 else "holding-both"
 	elif hs > 5.2:
 		a = "sprint"

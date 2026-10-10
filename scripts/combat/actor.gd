@@ -20,6 +20,7 @@ const REVIVE_TIME := 4.0       ## seconds a teammate must hold interact
 const REVIVE_HEALTH := 35.0
 
 ## Squad knock-down state (Battle Royale duos/squads). Solo and Multiplayer never enable it.
+var net_id := 0               ## LAN matches: stable id shared by all peers (0 offline)
 var can_be_downed := false
 var down_check := Callable()   ## optional: returns false if this actor must die instead (squad wiped)
 var downed := false

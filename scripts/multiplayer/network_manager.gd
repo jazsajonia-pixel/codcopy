@@ -5,9 +5,12 @@ extends Node
 ## profile names, and leave. This is real Godot high-level multiplayer (ENetMultiplayerPeer + RPCs)
 ## and can be tested with two instances on one machine or a LAN.
 ##
-## What does NOT exist yet: gameplay replication (player/bot state sync, authoritative hit
-## validation, match start across peers), internet matchmaking, servers, accounts, or anti-cheat.
-## Matches are always played offline against bots. See docs/ARCHITECTURE.md "Online roadmap".
+## LAN Team Deathmatch: the host presses START and every peer loads the same map; replication is
+## done by NetSync (scripts/multiplayer/net_sync.gd) with the host authoritative for damage, deaths,
+## scores, respawns, bots and match end.
+##
+## What does NOT exist: internet matchmaking, dedicated servers, NAT traversal, accounts, lag
+## compensation or anti-cheat. LAN play has only been tested with two instances on one machine.
 
 signal peers_changed
 signal status_changed(text: String)
@@ -42,7 +45,7 @@ func host(port: int = DEFAULT_PORT) -> Error:
 		return err
 	multiplayer.multiplayer_peer = p
 	is_host = true
-	peers = {1: {"name": str(SaveManager.profile.name)}}
+	peers = {1: {"name": str(SaveManager.profile.name), "op": str(SaveManager.profile.operator)}}
 	_set_status("Hosting LAN lobby on port %d" % port)
 	peers_changed.emit()
 	return OK
@@ -88,7 +91,7 @@ func _set_status(t: String) -> void:
 
 func _on_connected() -> void:
 	_set_status("Connected to lobby")
-	_register.rpc_id(1, str(SaveManager.profile.name))
+	_register.rpc_id(1, str(SaveManager.profile.name), str(SaveManager.profile.operator))
 
 
 func _on_peer_connected(_id: int) -> void:
@@ -104,11 +107,11 @@ func _on_peer_disconnected(id: int) -> void:
 
 
 @rpc("any_peer", "reliable")
-func _register(player_name: String) -> void:
+func _register(player_name: String, operator_id: String = "") -> void:
 	if not is_host:
 		return
 	var id := multiplayer.get_remote_sender_id()
-	peers[id] = {"name": player_name.substr(0, 16)}
+	peers[id] = {"name": player_name.substr(0, 16), "op": String(GameDB.get_operator(operator_id).id)}
 	peers_changed.emit()
 	_sync_peers.rpc(peers)
 
@@ -117,3 +120,41 @@ func _register(player_name: String) -> void:
 func _sync_peers(p: Dictionary) -> void:
 	peers = p
 	peers_changed.emit()
+
+
+
+## Host: start a LAN Team Deathmatch for everyone in the lobby. Teams alternate by join order and
+## empty slots are filled with host-simulated bots (always tagged [BOT]).
+func start_lan_match(map_id: String = "outpost", score_limit: int = 50, time_limit: float = 600.0) -> bool:
+	if not is_host or peers.size() < 2:
+		return false
+	var ids := peers.keys()
+	ids.sort()
+	var teams := {}
+	var names := {}
+	var ops := {}
+	var slot := {}
+	var per_team := {0: 0, 1: 0}
+	for i in ids.size():
+		var id: int = ids[i]
+		var t := i % 2
+		teams[id] = t
+		slot[id] = per_team[t]
+		per_team[t] += 1
+		names[id] = peers[id].name
+		ops[id] = peers[id].get("op", "")
+	var cfg := {"active": true, "map": map_id, "teams": teams, "names": names, "ops": ops, "slot": slot,
+		"score_limit": score_limit, "time_limit": time_limit, "team_size": maxi(5, maxi(per_team[0], per_team[1]))}
+	_begin.rpc(cfg)
+	return true
+
+
+@rpc("authority", "call_local", "reliable")
+func _begin(cfg: Dictionary) -> void:
+	MatchConfig.configure_mp("tdm", String(cfg.map))
+	MatchConfig.score_limit = int(cfg.score_limit)
+	MatchConfig.time_limit = float(cfg.time_limit)
+	MatchConfig.team_size = int(cfg.team_size)
+	MatchConfig.net = cfg
+	_set_status("LAN match in progress")
+	MatchConfig.start_match()

@@ -29,7 +29,7 @@ func _ready() -> void:
 	SaveManager.load_all()
 	SaveManager.profile.level = 8
 	match what:
-		"menu", "loadout", "settings", "operators", "br_page":
+		"menu", "loadout", "settings", "operators", "br_page", "online":
 			shots = [[1.5, what]]
 		"hud_editor":
 			shots = [[1.0, what]]
@@ -75,7 +75,7 @@ func _ready() -> void:
 
 func _open() -> void:
 	match what:
-		"menu", "loadout", "settings", "operators", "br_page":
+		"menu", "loadout", "settings", "operators", "br_page", "online":
 			get_tree().change_scene_to_file("res://scenes/menus/main_menu.tscn")
 		"hud_editor":
 			get_tree().change_scene_to_file("res://scenes/menus/hud_editor.tscn")
@@ -87,10 +87,13 @@ func _open() -> void:
 
 func _process(delta: float) -> void:
 	t += delta
-	if what in ["loadout", "settings", "operators", "br_page"] and t > 0.6 and t < 0.7:
+	if what in ["loadout", "settings", "operators", "br_page", "online"] and t > 0.6 and t < 0.7:
 		var cs := get_tree().current_scene
 		if cs and cs.has_method("show_page"):
 			cs.show_page({"br_page": "br"}.get(what, what))
+	if what == "online" and t > 0.8 and not has_meta("hosted"):
+		set_meta("hosted", true)
+		NetworkManager.host(24790)
 	if what == "drive":
 		var m = get_tree().current_scene
 		if m and m.get("vehicles") and m.player and m.player.parachute_state == 0 and m.phase >= 2:

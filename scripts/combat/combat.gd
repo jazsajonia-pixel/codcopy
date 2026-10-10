@@ -21,6 +21,11 @@ static func cone(dir: Vector3, deg: float, rng: RandomNumberGenerator = null) ->
 	return (dir * cos(ang) + (right * cos(phi) + up2 * sin(phi)) * sin(ang)).normalized()
 
 
+## LAN hooks (set by NetSync): replay shots / explosions as effects on the other peers.
+static var net_shot_hook := Callable()
+static var net_explode_hook := Callable()
+
+
 ## Fires one trigger pull (all pellets). Returns {hits, kills, headshot, positions}.
 static func fire_hitscan(shooter: Actor, origin: Vector3, dir: Vector3, w: WeaponInstance, spread: float, muzzle: Vector3, show_tracer: bool) -> Dictionary:
 	var space := shooter.get_world_3d().direct_space_state
@@ -56,6 +61,8 @@ static func fire_hitscan(shooter: Actor, origin: Vector3, dir: Vector3, w: Weapo
 					AudioManager.play_3d("res://assets/audio/sfx/bullet_impact.ogg", hit.position, -14.0, randf_range(0.9, 1.15), 25.0)
 		if show_tracer and (i == 0 or pellets > 1 and i % 3 == 0):
 			Effects.tracer(muzzle, end)
+		if i == 0 and net_shot_hook.is_valid():
+			net_shot_hook.call(shooter, muzzle, end, w.data.fire_sound)
 	return res
 
 
@@ -99,6 +106,8 @@ static func melee(attacker: Actor, origin: Vector3, dir: Vector3, reach: float, 
 static func explode(source: Actor, pos: Vector3, radius: float, damage: float, weapon_name: String, world: World3D, tree: SceneTree) -> int:
 	var space := world.direct_space_state
 	var n := 0
+	if net_explode_hook.is_valid():
+		net_explode_hook.call(source, pos, radius)
 	for node in tree.get_nodes_in_group("actors"):
 		var a: Actor = node
 		if not a.alive:

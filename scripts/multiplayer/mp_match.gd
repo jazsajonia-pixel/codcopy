@@ -1,6 +1,8 @@
 extends MatchBase
 ## Multiplayer mode against bots: Team Deathmatch (5v5) and Free-For-All (8 players).
-## NOTE: all opponents and teammates here are AI bots; they are never presented as online players.
+## Offline, all opponents and teammates are AI bots and are never presented as online players.
+## In a LAN match (MatchConfig.net.active) other humans appear as puppets driven by NetSync;
+## bots are simulated by the host only and always carry the [BOT] tag.
 
 const RESPAWN_TIME := 3.5
 const PRE_MATCH := 3.0
@@ -11,6 +13,8 @@ var countdown := PRE_MATCH
 var respawn_queue := {}   ## Actor -> seconds left
 var end_timer := -1.0
 var is_ffa := false
+var net: NetSync = null
+var host_lost := false
 
 
 func _ready() -> void:
@@ -19,6 +23,9 @@ func _ready() -> void:
 	var map_info: Dictionary = GameDB.MP_MAPS.get(MatchConfig.map_id, GameDB.MP_MAPS.outpost)
 	load_map(map_info.scene)
 	rules.setup(MatchConfig.mode, MatchConfig.score_limit, MatchConfig.time_limit)
+	if MatchConfig.net.get("active", false):
+		_net_ready()
+		return
 	rules.finished.connect(_on_rules_finished)
 	spawn_player(0)
 	player.inv.load_from_loadout(SaveManager.current_loadout())
@@ -39,7 +46,7 @@ func _ready() -> void:
 	AudioManager.play_2d("res://assets/audio/ambience/wind.ogg", -22.0)
 
 
-func _add_bot(team: int) -> void:
+func _add_bot(team: int) -> Bot:
 	var bot := spawn_bot(team)
 	var prim: Array = GameDB.weapon_ids_for_slot("primary")
 	var lo := {"primary": prim[rng.randi() % prim.size()], "secondary": "pistol_p9", "melee": "knife", "lethal": "frag", "tactical": "smoke"}
@@ -47,6 +54,7 @@ func _add_bot(team: int) -> void:
 		lo.attachments = {lo.primary: {"optic": "red_dot"}}
 	bot.inv.load_from_loadout(lo)
 	bot._refresh_gun_model()
+	return bot
 
 
 func _place_all() -> void:
@@ -71,6 +79,8 @@ func _place_all() -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	if net and not started:
+		return   # LAN: the host's _go starts everyone together
 	if not started:
 		countdown -= delta
 		if countdown <= 0.0:
@@ -86,19 +96,28 @@ func _process(delta: float) -> void:
 		if end_timer <= 0.0:
 			_finish()
 		return
+	if net and not net.is_host():
+		return   # clients: time, respawns and match end come from the host
 	rules.tick(delta)
 	for a in respawn_queue.keys():
+		if not is_instance_valid(a):
+			respawn_queue.erase(a)
+			continue
 		respawn_queue[a] -= delta
 		if respawn_queue[a] <= 0.0:
 			respawn_queue.erase(a)
 			a.respawn_at(_best_spawn(a))
 			if a == player:
 				player.yaw = player.rotation.y
+			if net:
+				net.host_respawned(a)
 
 
 func on_kill(victim: Actor, killer: Actor) -> void:
 	var kt := killer.team if killer and killer != victim else -1
 	rules.register_kill(kt, victim.team, kt)
+	if net and not net.is_host():
+		return
 	respawn_queue[victim] = RESPAWN_TIME + (0.5 if victim == player else 0.0)
 
 
@@ -128,6 +147,17 @@ func _best_spawn(a: Actor) -> Transform3D:
 
 
 func _on_rules_finished(winner_team: int) -> void:
+	if net and not net.is_host():
+		return   # wait for the host's verdict
+	if net:
+		net.host_ended(winner_team)
+	_end_match(winner_team)
+
+
+func _end_match(winner_team: int) -> void:
+	if ended:
+		return
+	rules.winner = winner_team
 	ended = true
 	end_timer = 3.0
 	var won := winner_team == player.team
@@ -144,7 +174,11 @@ func _finish() -> void:
 	var won := rules.winner == player.team
 	var res := player_stats()
 	res.merge({"mode": MatchConfig.mode, "map": MatchConfig.map_id, "won": won, "draw": rules.winner == -1,
-		"team_scores": rules.team_scores.duplicate(), "scoreboard": scoreboard(), "duration": elapsed})
+		"team_scores": rules.team_scores.duplicate(), "scoreboard": scoreboard(), "duration": elapsed,
+		"lan": net != null})
+	if net:
+		res.net_stats = net.stats.duplicate()
+		MatchConfig.net = {}
 	MatchConfig.finish_match(res)
 
 
@@ -165,3 +199,121 @@ func score_text() -> Array:
 
 func respawn_eta(a: Actor) -> float:
 	return maxf(respawn_queue.get(a, 0.0), 0.0)
+
+
+
+# ---------------- LAN (NetSync) ----------------
+
+func _net_ready() -> void:
+	var cfg: Dictionary = MatchConfig.net
+	net = NetSync.new()
+	add_child(net)
+	net.setup(self)
+	rules.finished.connect(_on_rules_finished)
+	var me := multiplayer.get_unique_id()
+	var teams: Dictionary = cfg.teams
+	spawn_player(int(teams.get(me, 0)))
+	player.inv.load_from_loadout(SaveManager.current_loadout())
+	player.equip_current()
+	net.register(player, me)
+	if net.is_host():
+		var names: Dictionary = cfg.names
+		var ops: Dictionary = cfg.get("ops", {})
+		for id in teams.keys():
+			if int(id) != me:
+				_spawn_puppet(int(id), String(names.get(id, "Player")), int(teams[id]), String(ops.get(id, "")), false)
+		# Fill both teams up to team_size with host-simulated bots.
+		var counts := {0: 0, 1: 0}
+		for a in actors:
+			counts[a.team] = counts.get(a.team, 0) + 1
+		var i := 0
+		for t in [0, 1]:
+			while counts[t] < MatchConfig.team_size:
+				var b := _add_bot(t)
+				b.actor_name += " [BOT]"
+				b.name_tag.text = b.actor_name
+				net.register(b, NetSync.BOT_ID_BASE - i)
+				i += 1
+				counts[t] += 1
+		_place_all()
+		for b in bots:
+			b.set_physics_process(false)
+		net.host_roster()
+	else:
+		_place_self()
+	player.allow_input = false
+	announcement.emit("LAN " + GameDB.MP_MODES[MatchConfig.mode].name, "Waiting for players")
+	AudioManager.play_2d("res://assets/audio/ambience/wind.ogg", -22.0)
+
+
+func _spawn_puppet(id: int, pname: String, team: int, op: String, is_bot: bool) -> Bot:
+	var b: Bot = BOT_SCENE.instantiate()
+	if op == "":
+		op = GameDB.OPERATORS[0].id
+	b.setup(pname, team, op, MatchConfig.difficulty_params())
+	b.match_node = self
+	b.puppet = true
+	b.net = net
+	b.collision_layer = 2
+	add_child(b)
+	_register(b)
+	net.register(b, id)
+	if not is_bot:
+		b.name_tag.text = pname
+	var prim: Array = GameDB.weapon_ids_for_slot("primary")
+	b.inv.load_from_loadout({"primary": prim[0], "secondary": "pistol_p9", "melee": "knife", "lethal": "frag", "tactical": "smoke"})
+	b._refresh_gun_model()
+	return b
+
+
+## Client: create puppets for everyone in the host's roster except ourselves.
+func build_puppets(r: Array) -> void:
+	var me := multiplayer.get_unique_id()
+	for e in r:
+		var id := int(e.id)
+		if id == me or net.by_id.has(id):
+			continue
+		var b := _spawn_puppet(id, String(e.name), int(e.team), String(e.op), bool(e.bot))
+		b.global_position = Vector3(0, -50, 0)   # hidden until the first state arrives
+	announcement.emit("LAN " + GameDB.MP_MODES[MatchConfig.mode].name, "%d players + bots connected" % NetworkManager.peers.size())
+
+
+func _place_self() -> void:
+	var idx: int = int(MatchConfig.net.get("slot", {}).get(multiplayer.get_unique_id(), 0))
+	var pool: Array = map.spawns_a if player.team == 0 else map.spawns_b
+	var xf: Transform3D = pool[idx % pool.size()]
+	player.global_transform = xf
+	player.yaw = xf.basis.get_euler().y
+
+
+## Everyone (from the host's _go RPC): start the match together.
+func net_go() -> void:
+	started = true
+	player.allow_input = true
+	for b in bots:
+		b.set_physics_process(true)
+	announcement.emit("FIGHT", "")
+	AudioManager.play_2d("res://assets/audio/ui/confirmation_001.ogg", -2.0)
+
+
+func net_end(winner: int) -> void:
+	_end_match(winner)
+
+
+func remove_net_actor(id: int) -> void:
+	var a: Actor = net.by_id.get(id)
+	if a == null or a == player:
+		return
+	net.by_id.erase(id)
+	actors.erase(a)
+	respawn_queue.erase(a)
+	kill_feed.emit("", a.actor_name + " left the match", "", false, 0)
+	a.queue_free()
+
+
+func net_host_lost() -> void:
+	if ended or host_lost:
+		return
+	host_lost = true
+	announcement.emit("HOST DISCONNECTED", "Returning to menu")
+	_end_match(-1)

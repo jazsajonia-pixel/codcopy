@@ -562,6 +562,23 @@ func _death_cam(delta: float) -> void:
 	camera.fov = lerpf(camera.fov, base_fov, clampf(delta * 4.0, 0, 1))
 
 
+## LAN client: our health is owned by the host. Local sources (own grenade, fall) are reported
+## instead of applied; the host replies with authoritative health via net_hurt / state.
+func take_damage(amount: float, attacker: Actor, weapon_name: String = "", headshot: bool = false, from_pos: Vector3 = Vector3.ZERO) -> bool:
+	var m = get_parent()
+	if m and m.get("net") and not m.net.is_host():
+		if alive and amount > 0.0 and (attacker == null or attacker == self):
+			m.net.report_hit(self, amount, attacker, weapon_name, headshot, from_pos)
+		return false
+	return super.take_damage(amount, attacker, weapon_name, headshot, from_pos)
+
+
+func net_hurt(from_pos: Vector3, attacker: Actor) -> void:
+	_since_damage = 0.0
+	_cancel_use()
+	damaged.emit(1.0, from_pos, attacker)
+
+
 func _on_knocked() -> void:
 	ads_on = false
 	sprinting = false

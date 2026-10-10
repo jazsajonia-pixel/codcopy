@@ -15,7 +15,10 @@ var time_limit := 480.0
 var team_size := 5
 var ffa_players := 8
 var br_players := 16
-var br_squad_size := 1        ## 1 solo, 2 duo, 4 squad (AI teammates)
+var br_squad_size := 1
+## LAN match description from NetworkManager ({} when offline):
+## {active, teams: {peer_id: team}, names: {peer_id: name}, ops: {peer_id: operator}, slot: {peer_id: spawn index}}
+var net := {}        ## 1 solo, 2 duo, 4 squad (AI teammates)
 var bot_difficulty := "normal"
 var last_results := {}
 
@@ -25,6 +28,7 @@ var fast_test := false
 
 
 func configure_mp(p_mode: String, p_map: String) -> void:
+	net = {}
 	mode = p_mode
 	map_id = p_map
 	var m: Dictionary = GameDB.MP_MODES[p_mode]
@@ -36,6 +40,7 @@ func configure_mp(p_mode: String, p_map: String) -> void:
 
 
 func configure_br() -> void:
+	net = {}
 	mode = "br"
 	map_id = "isla"
 	bot_difficulty = SaveManager.get_setting("bots", "difficulty", "normal")

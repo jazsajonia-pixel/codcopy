@@ -139,8 +139,20 @@ func random_patrol_point(_bot: Bot) -> Vector3:
 	return NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, p)
 
 
+var net_paused := false
+
+
 func toggle_pause() -> void:
 	if ended:
+		return
+	if MatchConfig.net.get("active", false):
+		# A LAN match can't be paused for everyone: show the menu, keep the world running.
+		net_paused = not net_paused
+		if player:
+			player.allow_input = not net_paused
+		if hud:
+			hud.show_pause(net_paused)
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if net_paused else Input.MOUSE_MODE_CAPTURED
 		return
 	get_tree().paused = not get_tree().paused
 	if hud:

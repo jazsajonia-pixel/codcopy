@@ -29,6 +29,10 @@ func _ready() -> void:
 			_finish()
 		"tdm", "ffa", "br", "br_squad", "touch":
 			_start_match_test()
+		"net_host", "net_client":
+			var nt: Node = load("res://tests/net_test.gd").new()
+			nt.role = mode.substr(4)
+			get_tree().root.add_child.call_deferred(nt)
 		"squad":
 			get_tree().root.add_child.call_deferred(load("res://tests/squad_test.gd").new())
 		"vehicle":
@@ -231,8 +235,16 @@ func _menus() -> void:
 	bp.squad_buttons[1].pressed.emit()
 	check(MatchConfig.br_squad_size == 1, "BR SOLO button selects solo")
 	# LAN lobby host/leave (real ENet socket on localhost).
+	menu.show_page("online")
+	await get_tree().process_frame
+	var op: Node = menu.content.get_child(menu.content.get_child_count() - 1)
 	var err := NetworkManager.host(24999)
 	check(err == OK and NetworkManager.is_online(), "LAN host starts")
+	await get_tree().process_frame
+	check(op.start_btn.visible and op.start_btn.disabled, "LAN START shown to host, disabled until someone joins")
+	op.map_btns["crossroads"].pressed.emit()
+	check(op.lan_map == "crossroads", "LAN map selection works")
+	check(not NetworkManager.start_lan_match(), "LAN match can't start with only the host")
 	NetworkManager.leave()
 	check(not NetworkManager.is_online(), "LAN leave")
 	menu.queue_free()
