@@ -181,6 +181,8 @@ func _physics_process(delta: float) -> void:
 		input.fire = false
 	if input.jump:
 		_jump_at = Time.get_ticks_msec()
+	view_model.use_item = using_item
+	view_model.use_progress = 1.0 - use_left / maxf(use_total, 0.01) if using_item != "" else 0.0
 	_apply_look(delta)
 	_handle_actions()
 	_move(delta)
@@ -260,10 +262,10 @@ func _handle_actions() -> void:
 	if input.melee:
 		do_melee(camera.global_position, look_dir())
 		view_model.on_melee()
-	if input.lethal:
-		throw_equipment("lethal", camera.global_position, look_dir())
-	if input.tactical:
-		throw_equipment("tactical", camera.global_position, look_dir())
+	if input.lethal and throw_equipment("lethal", camera.global_position, look_dir()):
+		view_model.on_throw()
+	if input.tactical and throw_equipment("tactical", camera.global_position, look_dir()):
+		view_model.on_throw()
 	if input.heal:
 		var h := inv.best_heal()
 		if h != "":

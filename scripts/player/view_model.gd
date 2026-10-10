@@ -1,10 +1,8 @@
 class_name ViewModel
 extends Node3D
-## First-person weapon presentation: gun model, procedural arms, attachments, skins,
-## and procedural animation (bob, sway, recoil kick, reload, weapon switch, ADS).
-
-const ARM_COLOR := Color(0.27, 0.31, 0.2)
-const GLOVE_COLOR := Color(0.12, 0.12, 0.11)
+## First-person weapon presentation: gun model, rigged arms (WRAD Arms, CC0) posed with IK, attachments,
+## skins, and procedural animation (bob, sway, recoil kick, reload with magazine swap, pump/bolt cycling,
+## weapon switch, ADS, melee, grenade throw, healing/plating, unarmed guard).
 
 var weapon: WeaponInstance
 var gun: Node3D
@@ -25,7 +23,21 @@ var bob_t := 0.0
 var switch_t := 0.0     ## > 0 while lowering/raising
 var melee_t := 0.0
 var ads := 0.0          ## 0..1 blend, set by player
-var arms: Node3D
+var arms: FPArms
+var throw_t := 0.0      ## > 0 while throwing a grenade
+var use_item := ""      ## item being used (heal/plate), set by player
+var use_progress := 0.0
+var sprinting_now := false
+## Hand anchor points in gun-local space (filled from the gun's bones).
+var grip_local := Vector3(0, -0.05, 0.06)
+var fore_local := Vector3(0, -0.03, -0.2)
+var pump_bone := -1
+var pump_rest := Vector3.ZERO
+var bolt_bone := -1
+var bolt_rest := Vector3.ZERO
+var slide_bone := -1
+var slide_rest := Vector3.ZERO
+var _punch_side := 0
 
 
 func _ready() -> void:
@@ -49,6 +61,10 @@ func _ready() -> void:
 	flash_light.light_energy = 2.0
 	flash.add_child(flash_light)
 	flash.visible = false
+	arms = FPArms.new()
+	arms.position = Vector3(0.0, -0.21, 0.1)
+	add_child(arms)
+	arms.set_skin(SaveManager.get_setting("graphics", "arm_skin", "pale") == "dark")
 
 
 func set_weapon(w: WeaponInstance) -> void:
@@ -58,10 +74,8 @@ func set_weapon(w: WeaponInstance) -> void:
 		gun = null
 	if flash.get_parent():
 		flash.get_parent().remove_child(flash)
-	if arms:
-		arms.queue_free()
-		arms = null
 	if w == null:
+		switch_t = 0.25
 		return
 	gun = load(w.data.model_path).instantiate()
 	add_child(gun)
@@ -83,11 +97,17 @@ func set_weapon(w: WeaponInstance) -> void:
 		mag_bone = skeleton.find_bone("Magazine")
 		if mag_bone >= 0:
 			mag_rest = skeleton.get_bone_pose_position(mag_bone)
+		pump_bone = skeleton.find_bone("Pump")
+		bolt_bone = skeleton.find_bone("Bolt")
+		slide_bone = skeleton.find_bone("Slide")
+		if pump_bone >= 0: pump_rest = skeleton.get_bone_pose_position(pump_bone)
+		if bolt_bone >= 0: bolt_rest = skeleton.get_bone_pose_position(bolt_bone)
+		if slide_bone >= 0: slide_rest = skeleton.get_bone_pose_position(slide_bone)
+	_find_hand_points()
 	gun.add_child(flash)
 	flash.position = muzzle_local + Vector3(0, 0, -0.06)
 	_build_attachments()
 	_apply_skin()
-	_build_arms()
 	switch_t = 0.35
 
 
@@ -179,43 +199,37 @@ func _apply_skin() -> void:
 		(m as MeshInstance3D).material_overlay = ov
 
 
-## Simple original placeholder arms (no licensed FP arms asset was available as CC0).
-func _build_arms() -> void:
-	arms = Node3D.new()
-	gun.add_child(arms)
-	var sleeve := StandardMaterial3D.new()
-	sleeve.albedo_color = ARM_COLOR
-	var glove := StandardMaterial3D.new()
-	glove.albedo_color = GLOVE_COLOR
-	var grip := Vector3(0, -0.06, 0.06)
-	var fore := Vector3(0, -0.03, muzzle_local.z * 0.55)
-	_arm(grip, Vector3(0.09, -0.16, 0.42), sleeve, glove)
-	_arm(fore, Vector3(-0.16, -0.2, 0.25), sleeve, glove)
+func _bone_local(name: String) -> Variant:
+	if skeleton == null:
+		return null
+	var b := skeleton.find_bone(name)
+	if b < 0:
+		return null
+	return _rel_xform(skeleton, gun) * skeleton.get_bone_global_pose(b).origin
 
 
-func _arm(hand: Vector3, elbow: Vector3, sleeve: Material, glove: Material) -> void:
-	var fore := MeshInstance3D.new()
-	var cm := CapsuleMesh.new()
-	cm.radius = 0.032
-	cm.height = hand.distance_to(elbow) + 0.06
-	cm.radial_segments = 8
-	cm.rings = 2
-	fore.mesh = cm
-	fore.material_override = sleeve
-	fore.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	arms.add_child(fore)
-	var mid := (hand + elbow) * 0.5
-	var dir := (hand - elbow).normalized()
-	var b := Basis.looking_at(dir, Vector3.UP if absf(dir.y) < 0.95 else Vector3.FORWARD)
-	fore.transform = Transform3D(b * Basis(Vector3.RIGHT, PI * 0.5), mid)
-	var g := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.05, 0.06, 0.07)
-	g.mesh = bm
-	g.material_override = glove
-	g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	g.position = hand
-	arms.add_child(g)
+## Grip (right hand) and support (left hand) points from the gun's own bones.
+func _find_hand_points() -> void:
+	var length := _gun_length()
+	var trig = _bone_local("Trigger")
+	var pistol: bool = weapon.data.category == "PISTOL"
+	grip_local = (trig + Vector3(0, -0.045, 0.04)) if trig != null else Vector3(0, -0.05, length * 0.2)
+	if pistol:
+		grip_local = (trig + Vector3(0, -0.04, 0.035)) if trig != null else Vector3(0, -0.04, 0.03)
+		fore_local = grip_local + Vector3(-0.025, -0.012, -0.01)
+		return
+	var pump = _bone_local("Pump")
+	var rail = _bone_local("Attach_Rail.Bottom")
+	if pump != null:
+		fore_local = pump + Vector3(0.008, -0.04, 0)
+	elif rail != null:
+		fore_local = rail + Vector3(0.008, -0.045, 0.02)
+	else:
+		fore_local = Vector3(0, -0.035, muzzle_local.z * 0.55)
+
+
+func on_throw() -> void:
+	throw_t = 0.55
 
 
 func on_shot() -> void:
@@ -233,6 +247,7 @@ func on_shot() -> void:
 
 func on_melee() -> void:
 	melee_t = 0.3
+	_punch_side = 1 - _punch_side
 
 
 func muzzle_global() -> Vector3:
@@ -243,7 +258,10 @@ func muzzle_global() -> Vector3:
 
 ## Called every frame by the player.
 func animate(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, sprinting: bool) -> void:
+	sprinting_now = sprinting
+	throw_t = maxf(throw_t - delta, 0.0)
 	if weapon == null or gun == null:
+		_animate_unarmed(delta, look_delta, speed01, on_floor, sprinting)
 		return
 	flash_t -= delta
 	if flash_t <= 0.0:
@@ -292,8 +310,144 @@ func animate(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, 
 		var m := sin((1.0 - melee_t / 0.3) * PI)
 		pos += Vector3(-0.1 * m, 0.05 * m, -0.15 * m)
 		rot += Vector3(0, deg_to_rad(-35 * m), deg_to_rad(-30 * m))
+	# Pump / bolt / slide cycling after each shot.
+	var cyc := _cycle_phase()
+	if pump_bone >= 0:
+		skeleton.set_bone_pose_position(pump_bone, pump_rest + Vector3(0, 0, 0.075 * cyc))
+	if bolt_bone >= 0 and weapon.data.fire_mode == WeaponData.FireMode.BOLT:
+		skeleton.set_bone_pose_position(bolt_bone, bolt_rest + Vector3(0, 0, 0.06 * cyc))
+	if slide_bone >= 0:
+		skeleton.set_bone_pose_position(slide_bone, slide_rest + Vector3(0, 0, 0.03 * clampf(kick / 0.09, 0, 1)))
+	if throw_t > 0.0 or use_item != "":
+		var k := sin(clampf((0.55 - throw_t) / 0.55, 0, 1) * PI) if throw_t > 0.0 else 1.0
+		pos += Vector3(0.06, -0.09 * k, 0.04 * k)
+		rot += Vector3(deg_to_rad(-25 * k), deg_to_rad(-10 * k), 0)
 	gun.position = gun.position.lerp(pos, clampf(delta * 22.0, 0, 1))
 	gun.rotation = gun.rotation.lerp(rot, clampf(delta * 16.0, 0, 1))
+	_pose_arms(delta, bob)
+
+
+## 0..1..0 over the cycling time after a shot for pump-action and bolt-action weapons.
+func _cycle_phase() -> float:
+	var fm := weapon.data.fire_mode
+	if fm != WeaponData.FireMode.PUMP and fm != WeaponData.FireMode.BOLT:
+		return 0.0
+	var interval := 60.0 / maxf(float(weapon.stats.fire_rate_rpm), 1.0)
+	if weapon.cooldown <= 0.0 or interval <= 0.0:
+		return 0.0
+	var p := 1.0 - weapon.cooldown / interval
+	# wait for the recoil, then rack
+	return sin(clampf((p - 0.2) / 0.7, 0, 1) * PI)
+
+
+func _gun_point(local: Vector3) -> Vector3:
+	return gun.transform * local
+
+
+## Hand orientation hints in camera space. -Z = finger direction, +Y = back of the hand.
+func _hand_basis(fingers: Vector3, back: Vector3) -> Basis:
+	var z := -fingers.normalized()
+	var y := (back - z * back.dot(z)).normalized()
+	return Basis(y.cross(z), y, z)
+
+
+func _pose_arms(delta: float, bob: Vector3) -> void:
+	var gb := gun.transform.basis
+	var pistol: bool = weapon.data.category == "PISTOL"
+	# Right hand: always on the grip, except while racking a bolt.
+	var r_pos := _gun_point(grip_local)
+	var r_basis := _hand_basis(gb * Vector3(-0.1, -0.25, -1.0), gb * Vector3(1.0, 0.1, 0.0))
+	var r_curl := 0.85
+	var cyc := _cycle_phase()
+	if weapon.data.fire_mode == WeaponData.FireMode.BOLT and bolt_bone >= 0 and cyc > 0.0:
+		var bolt_p: Vector3 = _bone_local("Bolt")
+		r_pos = r_pos.lerp(_gun_point(bolt_p + Vector3(0.05, 0.0, 0.03)), cyc)
+		r_curl = lerpf(0.85, 0.6, cyc)
+	# Left hand: foregrip / pump, magazine during reload, throws, items.
+	var l_pos := _gun_point(fore_local)
+	var l_basis: Basis
+	if pistol:
+		l_basis = _hand_basis(gb * Vector3(0.6, -0.4, -1.0), gb * Vector3(-1.0, -0.3, 0.0))
+	else:
+		l_basis = _hand_basis(gb * Vector3(0.75, 0.25, -0.6), gb * Vector3(-0.2, -1.0, 0.1))
+	var l_curl := 0.75
+	if pump_bone >= 0:
+		l_pos = _gun_point(_bone_local("Pump") + Vector3(0.008, -0.04, 0))
+	if weapon.reloading:
+		var p := weapon.reload_progress()
+		var mag_p = _bone_local("Magazine")
+		var mag_pos: Vector3 = _gun_point((mag_p + Vector3(-0.01, -0.07, 0.0)) if mag_p != null else (grip_local + Vector3(0, 0, -0.1)))
+		var below := mag_pos + Vector3(-0.06, -0.22, 0.05)
+		var mag_basis := _hand_basis(gb * Vector3(0.2, 0.9, -0.4), gb * Vector3(-1.0, 0.0, 0.2))
+		var tgt: Vector3
+		if pistol or mag_p == null:
+			# pistols / shotguns: support hand drops to the belt and comes back
+			var k := sin(clampf(p, 0, 1) * PI)
+			tgt = l_pos.lerp(below, k)
+		elif p < 0.15:
+			tgt = l_pos.lerp(mag_pos, p / 0.15)
+		elif p < 0.65:
+			tgt = mag_pos   # hand rides the magazine as it drops and is swapped
+		elif p < 0.85:
+			tgt = mag_pos
+		else:
+			tgt = mag_pos.lerp(l_pos, (p - 0.85) / 0.15)
+		l_pos = tgt
+		if not pistol and mag_p != null and p > 0.12 and p < 0.88:
+			l_basis = mag_basis
+			l_curl = 0.6
+	if throw_t > 0.0:
+		var tp := 1.0 - throw_t / 0.55
+		var back := Vector3(-0.22, 0.05, 0.05)
+		var fwd := Vector3(-0.05, 0.1, -0.5)
+		var arc := back.lerp(fwd, smoothstep(0.35, 0.75, tp))
+		var start := l_pos
+		l_pos = start.lerp(arc, sin(clampf(tp, 0, 1) * PI) * 0.95 + (0.05 if tp > 0.5 else 0.0))
+		l_basis = _hand_basis(Vector3(0.1, 0.4, -1.0), Vector3(-0.4, 1.0, 0.0))
+		l_curl = 0.9 if tp < 0.6 else 0.2
+	elif use_item != "":
+		var chest := Vector3(-0.12, -0.21 + 0.025 * sin(use_progress * TAU * 2.0), -0.3)
+		l_pos = chest
+		l_basis = _hand_basis(Vector3(0.3, 0.5, -1.0), Vector3(-0.5, 0.2, 0.8))
+		l_curl = 0.5
+	if melee_t > 0.0:
+		var m := sin((1.0 - melee_t / 0.3) * PI)
+		l_pos = l_pos.lerp(Vector3(-0.06, -0.06, -0.48), m)
+		l_basis = _hand_basis(Vector3(0.1, 0.0, -1.0), Vector3(0.0, 1.0, 0.0))
+		l_curl = 1.0
+	arms.set_hand("r", r_pos, r_basis, r_curl)
+	arms.set_hand("l", l_pos, l_basis, l_curl)
+	arms.apply(delta, switch_t > 0.3)
+
+
+## No weapon (BR before looting): boxing guard, alternate punches on melee.
+func _animate_unarmed(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, sprinting: bool) -> void:
+	melee_t = maxf(melee_t - delta, 0.0)
+	switch_t = maxf(switch_t - delta, 0.0)
+	sway = sway.lerp(look_delta * 0.0025, clampf(delta * 10.0, 0, 1))
+	if on_floor and speed01 > 0.05:
+		bob_t += delta * (11.0 if sprinting else 8.0) * maxf(speed01, 0.4)
+	var amp := 0.015 * speed01 * (1.8 if sprinting else 1.0)
+	var bob := Vector3(sin(bob_t) * amp, -absf(cos(bob_t)) * amp, 0.0) + Vector3(-sway.x, sway.y, 0)
+	var low := Vector3(0, -0.25 * switch_t / 0.25, 0)
+	var r := Vector3(0.13, -0.17, -0.33) + bob + low
+	var l := Vector3(-0.13, -0.16, -0.36) + bob * Vector3(-1, 1, 1) + low
+	if sprinting:
+		r += Vector3(0, -0.05 + sin(bob_t) * 0.04, 0.05)
+		l += Vector3(0, -0.05 - sin(bob_t) * 0.04, 0.05)
+	if melee_t > 0.0:
+		var m := sin((1.0 - melee_t / 0.3) * PI)
+		if _punch_side == 0:
+			r = r.lerp(Vector3(0.03, -0.08, -0.55), m)
+		else:
+			l = l.lerp(Vector3(-0.03, -0.08, -0.55), m)
+	if throw_t > 0.0:
+		var tp := 1.0 - throw_t / 0.55
+		l = l.lerp(Vector3(-0.05, 0.1, -0.5), sin(tp * PI))
+	var fist := _hand_basis(Vector3(0.0, 0.25, -1.0), Vector3(0.0, 1.0, 0.25))
+	arms.set_hand("r", r, fist.rotated(Vector3.FORWARD, deg_to_rad(-20)), 1.0)
+	arms.set_hand("l", l, fist.rotated(Vector3.FORWARD, deg_to_rad(20)), 1.0)
+	arms.apply(delta)
 
 
 func is_busy() -> bool:

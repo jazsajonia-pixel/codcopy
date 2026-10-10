@@ -180,6 +180,7 @@ func _graphics_tab() -> void:
 	_choice(v, "graphics", "fps_target", "Frame rate limit", [[30, "30"], [60, "60"], [90, "90"], [120, "120"]], "Higher uses more battery.", func(_p): SaveManager.set_setting("graphics", "preset", "custom"))
 	_slider(v, "graphics", "fov", "Field of view", 65.0, 100.0, 1.0, "", "%d")
 	_check(v, "graphics", "show_fps", "Show FPS counter")
+	_choice(v, "graphics", "arm_skin", "First-person arms skin tone", [["pale", "Light"], ["dark", "Dark"]], "Applies from the next match.")
 
 
 func _access_tab() -> void:

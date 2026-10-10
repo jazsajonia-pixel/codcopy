@@ -50,6 +50,7 @@ const DEFAULT_SETTINGS := {
 		"fps_target": 60,
 		"fov": 80.0,
 		"show_fps": false,
+		"arm_skin": "pale",          # first-person arms texture: pale | dark
 	},
 	"accessibility": {
 		"enemy_color": "red",       # red | orange | magenta

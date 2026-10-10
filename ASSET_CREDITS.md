@@ -20,7 +20,9 @@ License summary:
 | `assets/maps/survival/*.glb` (barrel, box, box-large, chest, fence-fortified, rock-a/b/c, structure-metal, structure-metal-wall, tent, tree, tree-tall, tree-autumn) + `Textures/colormap.png` | [Survival Kit](https://kenney.nl/assets/survival-kit) | Kenney | CC0 | GLB + PNG | None. Scaled at runtime. `chest.glb` is used for BR supply crates. |
 | `assets/vehicles/*.glb` (suv, truck, sedan, van, delivery, police, cone, box) + `Textures/colormap.png` | [Car Kit](https://kenney.nl/assets/car-kit) | Kenney | CC0 | GLB + PNG | None. Used as static cover props (vehicles are not drivable). |
 
-Procedural content (no external asset): first-person arms, house shells, walls, ramps, towers, terrain heightmap,
+| `assets/arms/arms.glb`, `arm_albedo_pale.png`, `arm_albedo_dark.png` (+ `LICENSE-CC0.txt`) | [WRAD Arms](https://github.com/wwwriks/wrad-arms) (also on [itch.io](https://wriks.itch.io/wrad-arms)), commit `f398724` | wriks | CC0 | GLB + PNG | None to the files. Posed at runtime with code-driven two-bone IK and finger curl; sleeves are procedural meshes attached to the arm bones. The asset has no animations; all first-person animations are procedural. |
+
+Procedural content (no external asset): uniform sleeves on the first-person arms, house shells, walls, ramps, towers, terrain heightmap,
 water plane, aircraft, parachute canopy, loot boxes, zone wall, all HUD graphics (crosshair, hit markers, minimap,
 touch buttons) are generated in code.
 
@@ -52,4 +54,4 @@ touch buttons) are generated in code.
 
 - [Quaternius Ultimate Gun Pack](https://opengameart.org/content/low-poly-guns-pack) (CC0) — FBX only; Flat Guns GLB used instead.
 - Kenney Blocky Characters, Kenney Crosshair Pack, Kenney Prototype Textures (CC0) — downloaded during research, not shipped.
-- No suitable CC0 first-person arms model was found, so arms are procedural placeholders. Mixamo was not used.
+- Mixamo was not used.
