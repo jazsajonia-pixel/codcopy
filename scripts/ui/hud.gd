@@ -58,6 +58,8 @@ func _ready() -> void:
 	player.hit_confirmed.connect(overlay.on_hit)
 	player.damaged.connect(func(_a, from, _att): overlay.on_damaged(from))
 	player.interact_target_changed.connect(_on_interact_target)
+	player.vehicle_changed.connect(_on_vehicle_changed)
+	player.set_meta("touch_controls", touch)
 	player.killed_enemy.connect(_on_player_kill)
 	match_node.kill_feed.connect(_on_kill_feed)
 	match_node.announcement.connect(show_announcement)
@@ -336,6 +338,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle_big_map()
 
 
+func _on_vehicle_changed(v: Vehicle) -> void:
+	touch.set_driving(v != null)
+	overlay.visible = v == null
+	if v:
+		interact_label.text = ("Driving " if player.vehicle_seat == 0 else "Riding ") + v.display_name() + ("" if player.touch_mode else "   [F] exit   [Space] handbrake")
+	else:
+		interact_label.text = ""
+
+
 func _on_interact_target(t: Node) -> void:
 	if t and is_instance_valid(t) and t.has_method("prompt"):
 		var txt: String = t.prompt()
@@ -412,6 +423,9 @@ func _process(delta: float) -> void:
 		parts.append("Med %d  Band %d  Plate %d" % [player.inv.heals.get("medkit", 0), player.inv.heals.get("bandage", 0), player.inv.plates])
 	var eq := "   ".join(parts)
 	equip_label.text = eq
+	if player.vehicle and is_instance_valid(player.vehicle):
+		var v := player.vehicle
+		equip_label.text = "%s  %d%%   %d km/h" % [v.display_name(), roundi(100.0 * v.health / v.max_health), roundi(v.speed() * 3.6)]
 	use_bar.visible = player.using_item != ""
 	if use_bar.visible:
 		use_bar.value = (1.0 - player.use_left / maxf(player.use_total, 0.01)) * 100.0

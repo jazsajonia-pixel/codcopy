@@ -47,11 +47,43 @@ func build() -> void:
 		var x := cos(a) * r
 		var z := sin(a) * r
 		patrol_points.append(Vector3(x, height(x, z), z))
+	_vehicle_spawns()
 	# Invisible border
 	b.blocker(Vector3(0, 40, -HALF), Vector3(HALF * 2, 100, 2))
 	b.blocker(Vector3(0, 40, HALF), Vector3(HALF * 2, 100, 2))
 	b.blocker(Vector3(-HALF, 40, 0), Vector3(2, 100, HALF * 2))
 	b.blocker(Vector3(HALF, 40, 0), Vector3(2, 100, HALF * 2))
+
+
+## Two drivable vehicles near every POI, on the flattest nearby ground that is clear of buildings.
+func _vehicle_spawns() -> void:
+	var kinds := ["suv", "sedan", "truck", "police", "van", "suv"]
+	var vi := 0
+	for p in poi_defs:
+		var placed := 0
+		for attempt in 24:
+			if placed >= 2:
+				break
+			var a := b.rng.randf() * TAU
+			var r := b.rng.randf_range(24.0, 40.0)
+			var x: float = p.pos.x + cos(a) * r
+			var z: float = p.pos.y + sin(a) * r
+			var hgt := height(x, z)
+			if hgt < 1.5 or Vector2(x, z).length() > ISLAND_R - 20.0:
+				continue
+			# slope check
+			var slope := absf(height(x + 2.5, z) - height(x - 2.5, z)) + absf(height(x, z + 2.5) - height(x, z - 2.5))
+			if slope > 1.4:
+				continue
+			var ok := true
+			for vp in vehicle_points:
+				if (vp.pos as Vector3).distance_to(Vector3(x, hgt, z)) < 8.0:
+					ok = false
+			if not ok:
+				continue
+			vehicle_points.append({"pos": Vector3(x, hgt + 0.9, z), "rot": b.rng.randf() * TAU, "kind": kinds[vi % kinds.size()]})
+			vi += 1
+			placed += 1
 
 
 # ---------------- Terrain ----------------

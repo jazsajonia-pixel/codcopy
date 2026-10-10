@@ -218,7 +218,8 @@ func _perceive() -> void:
 		if not in_fov:
 			continue
 		var q := PhysicsRayQueryParameters3D.create(eye, a.aim_point(), 1)
-		if not space.intersect_ray(q).is_empty():
+		var h1 := space.intersect_ray(q)
+		if not h1.is_empty() and not (a.vehicle != null and h1.collider == a.vehicle):
 			var q2 := PhysicsRayQueryParameters3D.create(eye, a.head_point(), 1)
 			if not space.intersect_ray(q2).is_empty():
 				continue

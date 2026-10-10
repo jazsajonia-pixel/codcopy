@@ -13,6 +13,7 @@ var patrol_points: Array = [] ## Array[Vector3]
 var loot_points: Array = []   ## Array[Vector3]
 var crate_points: Array = []
 var pois: Array = []          ## Array[{name, pos}]
+var vehicle_points: Array = [] ## Array[{pos: Vector3, rot: float (rad), kind: String}] drivable vehicle spawns
 var bounds := Rect2(-50, -50, 100, 100)
 var nav_baked := false
 

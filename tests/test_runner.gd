@@ -29,6 +29,8 @@ func _ready() -> void:
 			_finish()
 		"tdm", "ffa", "br", "touch":
 			_start_match_test()
+		"vehicle":
+			get_tree().root.add_child.call_deferred(load("res://tests/vehicle_test.gd").new())
 		"flow":
 			var ft: Node = load("res://tests/flow_test.gd").new()
 			get_tree().root.add_child.call_deferred(ft)

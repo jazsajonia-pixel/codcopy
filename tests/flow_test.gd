@@ -95,8 +95,45 @@ func _process(delta: float) -> void:
 					MatchConfig.to_menu()
 					stage = 0; t = 0
 				else:
-					_finish()
-					stage = 99
+					stage = 20; t = 0
+		20:  # BR: get in the nearest vehicle and drive it with the touch joystick
+			var m4: MatchBase = cs
+			var p: Player = m4.player
+			var best: Vehicle = null
+			for v in m4.get("vehicles"):
+				if best == null or v.global_position.distance_to(p.global_position) < best.global_position.distance_to(p.global_position):
+					best = v
+			check(best != null, "[br] vehicles spawned on the island (%d)" % (m4.get("vehicles") as Array).size())
+			if best == null:
+				_finish(); stage = 99; return
+			p.invulnerable_time = 999.0
+			best.enter(p)
+			var tc4: TouchControls = m4.hud.touch
+			check(p.vehicle == best and tc4.driving, "[br] entered vehicle; touch HUD in driving mode")
+			check(not tc4._button_active("fire") and tc4._button_active("interact"), "[br] weapon buttons hidden, EXIT shown while driving")
+			pos0 = best.global_position
+			var s4: Rect2 = tc4._safe()
+			jc = s4.position + Vector2(s4.size.x * 0.16, s4.size.y * 0.72)
+			_touch(1, jc, true)
+			_drag(1, jc + Vector2(0, -90), Vector2(0, -90))
+			stage = 21; t = 0
+		21:
+			if t > 3.0:
+				var m5: MatchBase = cs
+				var v5: Vehicle = m5.player.vehicle
+				var d5 := v5.global_position.distance_to(pos0) if v5 else 0.0
+				check(d5 > 4.0, "[br] touch joystick drives the vehicle (%.1f m)" % d5)
+				_touch(1, jc, false)
+				var tc5: TouchControls = m5.hud.touch
+				_touch(3, tc5._pos("interact"), true)
+				stage = 22; t = 0
+		22:
+			if t > 0.2:
+				var m6: MatchBase = cs
+				_touch(3, m6.hud.touch._pos("interact"), false)
+				check(m6.player.vehicle == null and m6.player.camera.current, "[br] EXIT button leaves the vehicle; first-person camera restored")
+				_finish()
+				stage = 99
 		10:  # BR: wait for the aircraft, press JUMP
 			var m2: MatchBase = cs
 			if m2.get("phase") == 1 and t > 0.5:   # Phase.PLANE

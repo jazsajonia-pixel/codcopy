@@ -5,6 +5,7 @@ extends Actor
 
 signal weapon_changed(w: WeaponInstance)
 signal interact_target_changed(target: Node)
+signal vehicle_changed(v: Vehicle)
 signal killed_enemy(victim: Actor, headshot: bool)
 
 const WALK_SPEED := 5.0
@@ -179,6 +180,10 @@ func _physics_process(delta: float) -> void:
 	if not allow_input:
 		input.move = Vector2.ZERO
 		input.fire = false
+	if vehicle:
+		_ride(delta)
+		input.clear_pressed()
+		return
 	if input.jump:
 		_jump_at = Time.get_ticks_msec()
 	view_model.use_item = using_item
@@ -189,6 +194,47 @@ func _physics_process(delta: float) -> void:
 	_handle_weapon(delta)
 	_scan_interact(delta)
 	input.clear_pressed()
+
+
+## In a vehicle: drive (driver seat) or ride, orbit the chase camera, exit with interact.
+func _ride(delta: float) -> void:
+	var v := vehicle
+	if not is_instance_valid(v):
+		vehicle = null
+		return
+	if vehicle_seat == 0:
+		var brake_held := Input.is_action_pressed("jump")
+		var tc = get_meta("touch_controls", null)
+		if touch_mode and tc and is_instance_valid(tc):
+			brake_held = tc.is_held("jump")
+		v.drive(input.move, brake_held)
+	var lk := input.look
+	if SaveManager.get_setting("controls", "invert_y", false):
+		lk.y = -lk.y
+	v.update_camera(delta, lk)
+	if input.interact:
+		v.exit(self)
+
+
+func on_enter_vehicle(v: Vehicle, seat: int) -> void:
+	super(v, seat)
+	ads_on = false
+	sprinting = false
+	v.chase_cam.current = true
+	v.chase_cam.global_position = global_position + Vector3.UP * 3.0 - v.global_transform.basis.z * 7.0
+	v.cam_yaw = 0.0
+	interact_target = null
+	interact_target_changed.emit(null)
+	vehicle_changed.emit(v)
+
+
+func on_exit_vehicle(v: Vehicle, pos: Vector3) -> void:
+	super(v, pos)
+	camera.current = true
+	if v:
+		yaw = atan2(-v.global_transform.basis.z.x, -v.global_transform.basis.z.z)
+		rotation.y = yaw
+	vehicle_changed.emit(null)
 
 
 func _apply_look(delta: float) -> void:

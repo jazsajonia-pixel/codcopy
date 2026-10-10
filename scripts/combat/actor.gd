@@ -53,6 +53,8 @@ var use_left := 0.0
 var use_total := 0.0
 
 var collision: CollisionShape3D
+var vehicle: Vehicle = null     ## vehicle this actor is sitting in
+var vehicle_seat := -1
 var capsule: CapsuleShape3D
 
 
@@ -134,6 +136,8 @@ func take_damage(amount: float, attacker: Actor, weapon_name: String = "", heads
 
 
 func _die(killer: Actor, weapon_name: String, headshot: bool) -> void:
+	if vehicle and is_instance_valid(vehicle):
+		vehicle.exit(self)
 	alive = false
 	deaths += 1
 	streak = 0
@@ -147,6 +151,38 @@ func _die(killer: Actor, weapon_name: String, headshot: bool) -> void:
 	_damagers.clear()
 	_on_died()
 	died.emit(self, killer, weapon_name, headshot)
+
+
+## Vehicle hooks (overridden by Player for cameras/HUD).
+func on_enter_vehicle(_v: Vehicle, seat: int) -> void:
+	vehicle_seat = seat
+	velocity = Vector3.ZERO
+	# Take the body out of physics immediately (a deferred disable lets it push the car for a frame).
+	collision_layer = 0
+	collision_mask = 0
+	collision.set_deferred("disabled", true)
+	_cancel_use()
+	for w in inv.weapons:
+		if w:
+			w.cancel_reload()
+	_set_body_visible(false)
+
+
+func on_exit_vehicle(v: Vehicle, pos: Vector3) -> void:
+	vehicle_seat = -1
+	global_position = pos
+	velocity = v.linear_velocity * 0.4 if v else Vector3.ZERO
+	collision_layer = 2
+	collision_mask = 1 | 2
+	collision.set_deferred("disabled", not alive)
+	_set_body_visible(true)
+
+
+## Occupants stay "visible" for game logic (zone, targeting); only their models are hidden.
+func _set_body_visible(v: bool) -> void:
+	for c in get_children():
+		if c is Node3D and not (c is CollisionShape3D) and not (c is Camera3D) and c.name != "Head":
+			(c as Node3D).visible = v
 
 
 ## Hook for subclasses (animations, camera).

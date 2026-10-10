@@ -252,3 +252,37 @@ func blocked_by_smoke(a: Vector3, b: Vector3) -> bool:
 		if (a + ab * t).distance_to(c) < v.radius:
 			return true
 	return false
+
+
+## Continuous dark smoke attached to a node (damaged vehicles). Returns the emitter.
+func smoke_trail(parent: Node3D, offset: Vector3) -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.amount = 24 if _quality() > 0 else 10
+	p.lifetime = 2.2
+	p.position = offset
+	var pm := ParticleProcessMaterial.new()
+	pm.direction = Vector3.UP
+	pm.spread = 18.0
+	pm.initial_velocity_min = 1.2
+	pm.initial_velocity_max = 2.4
+	pm.gravity = Vector3(0, 0.6, 0)
+	pm.scale_min = 0.6
+	pm.scale_max = 1.4
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.15, 0.15, 0.15, 0.7))
+	grad.set_color(1, Color(0.3, 0.3, 0.3, 0.0))
+	var gt := GradientTexture1D.new()
+	gt.gradient = grad
+	pm.color_ramp = gt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(1.2, 1.2)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	q.material = m
+	p.draw_pass_1 = q
+	parent.add_child(p)
+	return p

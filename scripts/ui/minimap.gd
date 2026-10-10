@@ -66,6 +66,14 @@ func _draw() -> void:
 			draw_circle(mp, 3.0, Color(1, 1, 1, 0.6))
 			if full_map:
 				_text(mp + Vector2(0, -8), poi.name, 14, Color(1, 1, 1, 0.9))
+	# Vehicles
+	for v in get_tree().get_nodes_in_group("vehicles"):
+		if not v.alive:
+			continue
+		var vp := _w2m(v.global_position)
+		if full_map or (absf(vp.x - c.x) < R - 8 and absf(vp.y - c.y) < R - 8):
+			var col := Color(0.55, 0.85, 1.0, 0.95) if v.driver() == null else Color(1.0, 0.85, 0.4, 0.95)
+			draw_rect(Rect2(vp - Vector2(4, 3), Vector2(8, 6)), col)
 	# Zone (BR)
 	if match_node.has_method("zone_info"):
 		var z: Dictionary = match_node.zone_info()

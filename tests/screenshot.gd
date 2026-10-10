@@ -51,6 +51,12 @@ func _ready() -> void:
 			MatchConfig.configure_br()
 			MatchConfig.br_players = 10
 			shots = [[2.5, "br_plane"], [6.5, "br_chute"], [16.0, "br_ground"], [30.0, "br_ground2"]]
+		"drive":
+			MatchConfig.autoplay_player = true
+			MatchConfig.fast_test = true
+			MatchConfig.configure_br()
+			MatchConfig.br_players = 8
+			shots = [[16.0, "drive_a"], [18.5, "drive_b"]]
 		"results":
 			MatchConfig.last_results = {"mode": "tdm", "won": true, "kills": 12, "deaths": 4, "assists": 3, "score": 1450, "headshots": 4, "accuracy": 0.31,
 				"team_scores": {0: 40, 1: 33}, "duration": 312.0, "rewards": {"xp": 1850, "credits": 270, "levels": [9]},
@@ -78,6 +84,22 @@ func _process(delta: float) -> void:
 		var cs := get_tree().current_scene
 		if cs and cs.has_method("show_page"):
 			cs.show_page({"br_page": "br"}.get(what, what))
+	if what == "drive":
+		var m = get_tree().current_scene
+		if m and m.get("vehicles") and m.player and m.player.parachute_state == 0 and m.phase >= 2:
+			var p: Player = m.player
+			if p.vehicle == null and p.alive and p.is_on_floor() and not has_meta("entered"):
+				set_meta("entered", true)
+				MatchConfig.autoplay_player = false
+				var v: Vehicle = m.vehicles[0]
+				p.global_position = v.global_position + Vector3(3, 0.5, 0)
+				print("  entering ", v.kind, " at ", v.global_position, " hp ", v.health, " alive ", v.alive)
+				p.died.connect(func(_a, k, w, _h): print("  PLAYER DIED by ", k, " with ", w, " at ", p.global_position))
+				p.invulnerable_time = 999.0
+				v.enter(p)
+			if p.vehicle:
+				p.input.move = Vector2(-0.25, -1.0)
+				p.input.look = Vector2.ZERO
 	if idx < shots.size() and t >= shots[idx][0]:
 		var img := get_viewport().get_texture().get_image()
 		var p: String = dir.path_join(shots[idx][1] + ".png")

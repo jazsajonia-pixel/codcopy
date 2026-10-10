@@ -34,6 +34,7 @@ const MOUSE_FINGER := 99
 var player: Player
 var edit_mode := false
 var br_mode := false
+var driving := false         ## in a vehicle: only movement, look, EXIT, BRAKE, pause, scoreboard
 var layout := {}
 var selected := ""
 var _fingers := {}           ## index -> {kind: "joy"/"look"/"btn", id, start, last}
@@ -106,12 +107,28 @@ func _button_active(id: String) -> bool:
 		return false
 	if DEFAULTS[id].get("br_only", false) and not br_mode and not edit_mode:
 		return false
-	if id == "interact" and not _interact_available and not edit_mode:
+	if driving and not edit_mode:
+		return id in ["interact", "jump", "pause", "score"]
+	if id == "interact" and not _interact_available and not edit_mode and not driving:
 		return false
 	return true
 
 
+func set_driving(v: bool) -> void:
+	driving = v
+	layout.interact.label = "EXIT" if v else "PICK"
+	layout.jump.label = "BRAKE" if v else "JUMP"
+	release_all()
+	queue_redraw()
+
+
+func is_held(id: String) -> bool:
+	return _pressed.has(id)
+
+
 func set_interact_available(v: bool, text: String = "PICK") -> void:
+	if driving:
+		return
 	_interact_available = v
 	layout.interact.label = text
 	queue_redraw()

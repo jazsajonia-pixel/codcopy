@@ -48,6 +48,9 @@ static func fire_hitscan(shooter: Actor, origin: Vector3, dir: Vector3, w: Weapo
 					res.kills += 1
 				Effects.impact(hit.position, hit.normal, true)
 			else:
+				if col != null and col.has_method("take_vehicle_damage"):
+					col.take_vehicle_damage(_damage_at(w.stats, origin.distance_to(hit.position)) * 0.6, shooter)
+					res.hits += 1
 				Effects.impact(hit.position, hit.normal, false)
 				if i == 0:
 					AudioManager.play_3d("res://assets/audio/sfx/bullet_impact.ogg", hit.position, -14.0, randf_range(0.9, 1.15), 25.0)
@@ -117,4 +120,9 @@ static func explode(source: Actor, pos: Vector3, radius: float, damage: float, w
 		a.take_damage(dmg, source, weapon_name, false, pos)
 		a.add_shake(0.6 * falloff + 0.2)
 		n += 1
+	for node in tree.get_nodes_in_group("vehicles"):
+		var v: Node3D = node
+		var vd := pos.distance_to(v.global_position + Vector3.UP * 0.8)
+		if vd < radius + 1.5 and v.has_method("take_vehicle_damage"):
+			v.take_vehicle_damage(damage * 2.5 * clampf(1.0 - vd / (radius + 1.5), 0.15, 1.0), source)
 	return n

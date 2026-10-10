@@ -54,6 +54,7 @@ func _ready() -> void:
 		b.visible = false
 	player.team = 0
 	_spawn_loot()
+	_spawn_vehicles()
 	_build_zone()
 	_build_plane()
 	_build_chute()
@@ -70,6 +71,18 @@ func _ready() -> void:
 
 
 # ---------------- Setup ----------------
+
+var vehicles: Array = []
+
+
+func _spawn_vehicles() -> void:
+	for vp in map.vehicle_points:
+		var v := Vehicle.new()
+		v.setup(vp.kind)
+		add_child(v)
+		v.global_transform = Transform3D(Basis(Vector3.UP, vp.rot), vp.pos)
+		vehicles.append(v)
+
 
 func _spawn_loot() -> void:
 	var weapons := GameDB.weapons.keys()
