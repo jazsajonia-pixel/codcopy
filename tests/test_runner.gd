@@ -33,6 +33,8 @@ func _ready() -> void:
 			var nt: Node = load("res://tests/net_test.gd").new()
 			nt.role = mode.substr(4)
 			get_tree().root.add_child.call_deferred(nt)
+		"phone":
+			get_tree().root.add_child.call_deferred(load("res://tests/phone_test.gd").new())
 		"keys":
 			get_tree().root.add_child.call_deferred(load("res://tests/keys_test.gd").new())
 		"dom":

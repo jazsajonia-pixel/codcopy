@@ -355,9 +355,18 @@ func _input(event: InputEvent) -> void:
 	# unless the player explicitly chose Touch. Emulated mouse events from touches never switch modes.
 	elif player and player.touch_mode and not MatchConfig.autoplay_player \
 			and SaveManager.get_setting("controls", "scheme", "auto") != "touch" \
-			and ((event is InputEventKey and event.pressed and not event.echo) \
+			and ((event is InputEventKey and event.pressed and not event.echo and _is_game_key(event)) \
 				or (event is InputEventJoypadButton and event.pressed)):
 		set_keyboard_mode()
+
+
+## True only for keys bound to gameplay actions (WASD, Space, R, ...). Android system keys such as
+## Back, volume or media keys must never hide the on-screen controls.
+func _is_game_key(e: InputEventKey) -> bool:
+	for action in InputSetup.KEYS.keys():
+		if action != "pause" and InputMap.has_action(action) and e.is_action(action, true):
+			return true
+	return false
 
 
 ## Switch the HUD and player to keyboard/mouse (or gamepad) controls.
