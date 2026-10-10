@@ -36,6 +36,7 @@ var fps_label: Label
 var hint_label: Label
 var streak_label: Label
 var squad_label: Label
+var flags_label: RichTextLabel
 var status_label: Label
 var _last_revive: Actor = null
 var streak_t := 0.0
@@ -141,6 +142,16 @@ func _build_bottom() -> void:
 	root.add_child(equip_label)
 	hint_label = UITheme.shadowed(UITheme.label("", 15, UITheme.MUTED))
 	root.add_child(hint_label)
+	flags_label = RichTextLabel.new()
+	flags_label.bbcode_enabled = true
+	flags_label.fit_content = true
+	flags_label.scroll_active = false
+	flags_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flags_label.add_theme_font_size_override("normal_font_size", 22)
+	flags_label.add_theme_constant_override("outline_size", 6)
+	flags_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	flags_label.visible = false
+	root.add_child(flags_label)
 	squad_label = UITheme.shadowed(UITheme.label("", 14, UITheme.FRIENDLY))
 	squad_label.visible = false
 	root.add_child(squad_label)
@@ -261,6 +272,8 @@ func _layout() -> void:
 	score_box.size = Vector2(280, 40)
 	br_label.position = Vector2(s.position.x + s.size.x * 0.5 - 250, s.position.y + 54)
 	br_label.size = Vector2(500, 30)
+	flags_label.position = Vector2(s.position.x + s.size.x * 0.5 - 250, s.position.y + 54)
+	flags_label.size = Vector2(500, 34)
 	killfeed.position = Vector2(s.end.x - 430, s.position.y + 70)
 	killfeed.size = Vector2(414, 200)
 	fps_label.position = s.position + Vector2(20, mm + 22)
@@ -451,6 +464,7 @@ func _process(delta: float) -> void:
 		var tl: float = match_node.time_left()
 		timer_label.text = "%d:%02d" % [int(tl) / 60, int(tl) % 60]
 		br_label.text = ""
+		_update_flags()
 	else:
 		score_box.visible = false
 		if match_node.has_method("br_status"):
@@ -474,12 +488,43 @@ func _process(delta: float) -> void:
 		_refresh_scoreboard()
 
 
+## Domination: colored flag letters (friendly / enemy / neutral) and the capture state under you.
+func _update_flags() -> void:
+	if not match_node.has_method("flag_states"):
+		return
+	var fs: Array = match_node.flag_states()
+	flags_label.visible = not fs.is_empty()
+	if fs.is_empty():
+		return
+	var parts: Array = []
+	var here := ""
+	for f in fs:
+		var c := Color(0.85, 0.85, 0.85)
+		if f.owner >= 0:
+			c = UITheme.FRIENDLY if f.owner == player.team else Bot._enemy_color()
+		parts.append("[color=#%s]%s[/color]" % [c.to_html(false), "[ %s ]" % f.letter if f.contested else f.letter])
+		var d := Vector2(player.global_position.x - f.pos.x, player.global_position.z - f.pos.z).length()
+		if player.alive and d <= DomFlag.RADIUS:
+			if f.contested:
+				here = "%s CONTESTED" % f.letter
+			elif f.owner == player.team and absf(f.progress) >= 1.0:
+				here = "%s SECURED" % f.letter
+			elif f.capturing == player.team:
+				var p: float = f.progress if player.team == 0 else -f.progress
+				if p < 0.0:
+					here = "NEUTRALIZING %s" % f.letter
+				else:
+					here = "CAPTURING %s  %d%%" % [f.letter, roundi(clampf(p, 0.0, 1.0) * 100.0)]
+	flags_label.text = "[center]" + "     ".join(parts) + ("     [color=#f0c040]%s[/color]" % here if here != "" else "") + "[/center]"
+
+
 ## Squad panel, downed status and revive prompts (Battle Royale duos/squads).
 func _update_squad() -> void:
 	var mates: Array = []
-	for a in match_node.actors:
-		if a != player and is_instance_valid(a) and a.team == player.team:
-			mates.append(a)
+	if int(match_node.get("squad_size") if match_node.get("squad_size") != null else 1) > 1:
+		for a in match_node.actors:
+			if a != player and is_instance_valid(a) and a.team == player.team:
+				mates.append(a)
 	squad_label.visible = not mates.is_empty()
 	if squad_label.visible:
 		var lines: Array = []

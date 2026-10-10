@@ -40,6 +40,11 @@ func _ready() -> void:
 				SaveManager.set_setting("controls", "scheme", "touch")
 			MatchConfig.configure_mp("tdm", "outpost")
 			shots = [[9.0, what + "_a"], [16.0, what + "_b"]]
+		"dom":
+			MatchConfig.autoplay_player = true
+			MatchConfig.fast_test = true
+			MatchConfig.configure_mp("dom", "outpost")
+			shots = [[14.0, "dom_a"], [22.0, "dom_b"]]
 		"crossroads":
 			MatchConfig.autoplay_player = true
 			MatchConfig.fast_test = true
@@ -91,6 +96,16 @@ func _process(delta: float) -> void:
 		var cs := get_tree().current_scene
 		if cs and cs.has_method("show_page"):
 			cs.show_page({"br_page": "br"}.get(what, what))
+	if what == "dom" and t > 12.0 and not has_meta("onflag"):
+		var dm = get_tree().current_scene
+		if dm and dm.get("flags") and not dm.flags.is_empty() and dm.player.alive:
+			set_meta("onflag", true)
+			MatchConfig.autoplay_player = false
+			var fb: DomFlag = dm.flags[1]
+			dm.player.global_position = fb.global_position + Vector3(2.5, 0.3, 3.5)
+			dm.player.yaw = atan2(2.5, 3.5)
+			dm.player.pitch = -0.1
+			dm.player.invulnerable_time = 99.0
 	if what == "online" and t > 0.8 and not has_meta("hosted"):
 		set_meta("hosted", true)
 		NetworkManager.host(24790)

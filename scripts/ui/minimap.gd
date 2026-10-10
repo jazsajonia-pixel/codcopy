@@ -66,6 +66,16 @@ func _draw() -> void:
 			draw_circle(mp, 3.0, Color(1, 1, 1, 0.6))
 			if full_map:
 				_text(mp + Vector2(0, -8), poi.name, 14, Color(1, 1, 1, 0.9))
+	# Domination flags
+	if match_node.has_method("flag_states"):
+		for f in match_node.flag_states():
+			var fp := _w2m(f.pos)
+			var col := Color(0.85, 0.85, 0.85)
+			if f.owner >= 0:
+				col = UITheme.FRIENDLY if f.owner == player.team else Bot._enemy_color()
+			draw_circle(fp, 9.0, Color(0, 0, 0, 0.55))
+			draw_arc(fp, 9.0, 0, TAU, 24, col, 2.0)
+			_text(fp, f.letter, 13, col)
 	# Vehicles
 	for v in get_tree().get_nodes_in_group("vehicles"):
 		if not v.alive:
@@ -95,7 +105,7 @@ func _draw() -> void:
 			continue
 		if not player.is_enemy(a):
 			_arrow(mp, a.rotation.y - (player.rotation.y if not full_map else 0.0), UITheme.FRIENDLY)
-		elif match_node.radar_pings.has(a):
+		elif match_node.radar_pings.has(a) or match_node.uav_active(player.team):
 			draw_circle(mp, 5.0, Bot._enemy_color())
 	# Player
 	var pp := _w2m(player.global_position)

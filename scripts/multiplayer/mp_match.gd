@@ -14,6 +14,8 @@ var respawn_queue := {}   ## Actor -> seconds left
 var end_timer := -1.0
 var is_ffa := false
 var net: NetSync = null
+var flags: Array = []        ## Domination capture points (A, B, C)
+var _dom_tick := 0.0
 var host_lost := false
 
 
@@ -39,6 +41,8 @@ func _ready() -> void:
 		for i in MatchConfig.team_size:
 			_add_bot(1)
 	_place_all()
+	if MatchConfig.mode == "dom":
+		_build_flags()
 	for b in bots:
 		b.set_physics_process(false)
 	player.allow_input = false
@@ -99,6 +103,7 @@ func _process(delta: float) -> void:
 	if net and not net.is_host():
 		return   # clients: time, respawns and match end come from the host
 	rules.tick(delta)
+	_tick_flags(delta)
 	for a in respawn_queue.keys():
 		if not is_instance_valid(a):
 			respawn_queue.erase(a)
@@ -317,3 +322,81 @@ func net_host_lost() -> void:
 	host_lost = true
 	announcement.emit("HOST DISCONNECTED", "Returning to menu")
 	_end_match(-1)
+
+
+
+# ---------------- Domination ----------------
+
+func _build_flags() -> void:
+	var ca := Vector3.ZERO
+	var cb := Vector3.ZERO
+	for xf in map.spawns_a:
+		ca += xf.origin
+	for xf in map.spawns_b:
+		cb += xf.origin
+	ca /= maxf(1.0, map.spawns_a.size())
+	cb /= maxf(1.0, map.spawns_b.size())
+	var nav := get_world_3d().navigation_map
+	var letters := ["A", "B", "C"]
+	var ts := [0.25, 0.5, 0.75]
+	for i in 3:
+		var f := DomFlag.new()
+		f.letter = letters[i]
+		var p: Vector3 = ca.lerp(cb, ts[i])
+		var q := NavigationServer3D.map_get_closest_point(nav, p)
+		if q != Vector3.ZERO or p.length() < 0.1:
+			p = q
+		add_child(f)
+		f.global_position = p
+		f.set_viewer_team(player.team)
+		f.captured.connect(_on_flag_captured)
+		flags.append(f)
+
+
+func _tick_flags(delta: float) -> void:
+	if flags.is_empty() or ended:
+		return
+	for f in flags:
+		f.tick(delta, actors)
+	_dom_tick += delta
+	if _dom_tick >= 2.0:
+		_dom_tick -= 2.0
+		for f in flags:
+			if f.owner_team >= 0:
+				rules.add_points(f.owner_team, 1)
+
+
+func _on_flag_captured(f: DomFlag, team: int) -> void:
+	for a in actors:
+		if a.alive and a.team == team and a.global_position.distance_to(f.global_position) <= DomFlag.RADIUS + 0.5:
+			a.score += 150
+	var ours := team == player.team
+	announcement.emit("FLAG %s %s" % [f.letter, "SECURED" if ours else "LOST"], "")
+	AudioManager.play_2d("res://assets/audio/ui/confirmation_001.ogg" if ours else "res://assets/audio/sfx/zone_warning.ogg", -4.0)
+
+
+## Bots in Domination: attack the nearest flag their team doesn't own, otherwise defend one.
+func objective_point(b: Actor) -> Vector3:
+	if flags.is_empty():
+		return Vector3.ZERO
+	var best: DomFlag = null
+	var bd := INF
+	for f in flags:
+		if f.owner_team == b.team:
+			continue
+		var d: float = b.global_position.distance_to(f.global_position) * (0.7 if f.letter == "B" else 1.0)
+		if d < bd:
+			bd = d
+			best = f
+	if best == null:
+		best = flags[b.get_instance_id() % flags.size()]
+	var off := Vector3(rng.randf_range(-3, 3), 0, rng.randf_range(-3, 3))
+	return best.global_position + off
+
+
+func flag_states() -> Array:
+	var out: Array = []
+	for f in flags:
+		out.append({"letter": f.letter, "owner": f.owner_team, "progress": f.progress, "pos": f.global_position,
+			"capturing": f.capturing_team, "contested": f.contested})
+	return out

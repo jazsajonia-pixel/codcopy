@@ -89,6 +89,8 @@ func _on_actor_died(victim: Actor, killer: Actor, weapon_name: String, headshot:
 	if killer and killer != victim:
 		killer.kills += 1
 		killer.streak += 1
+		if killer.streak == UAV_STREAK and MatchConfig.mode != "br":
+			grant_uav(killer)
 		killer.score += 100 + (25 if headshot else 0)
 		if headshot:
 			killer.headshot_kills += 1
@@ -122,8 +124,44 @@ func on_kill(_victim: Actor, _killer: Actor) -> void:
 	pass
 
 
+## Scorestreak: 3 kills without dying calls in a UAV that reveals the enemy team on the
+## minimap for 20 s (Multiplayer modes). Bots on a team with a UAV get the same information.
+const UAV_STREAK := 3
+const UAV_TIME := 20.0
+var uav_time := {}        ## team -> seconds left
+var _uav_bot_t := 0.0
+
+
+func uav_active(team: int) -> bool:
+	return float(uav_time.get(team, 0.0)) > 0.0
+
+
+func grant_uav(a: Actor) -> void:
+	uav_time[a.team] = UAV_TIME
+	var ours := player and a.team == player.team
+	announcement.emit("UAV ONLINE" if ours else "ENEMY UAV OVERHEAD", ("Called in by " + a.actor_name) if ours else "")
+	AudioManager.play_2d("res://assets/audio/ui/confirmation_001.ogg" if ours else "res://assets/audio/sfx/zone_warning.ogg", -6.0)
+
+
 func _process(delta: float) -> void:
 	elapsed += delta
+	for t in uav_time.keys():
+		uav_time[t] = maxf(0.0, uav_time[t] - delta)
+	_uav_bot_t -= delta
+	if _uav_bot_t <= 0.0:
+		_uav_bot_t = 3.0
+		for b in bots:
+			if b.alive and uav_active(b.team) and b.target == null:
+				var best: Actor = null
+				var bd := 70.0
+				for o in actors:
+					if o.alive and b.is_enemy(o):
+						var d: float = b.global_position.distance_to(o.global_position)
+						if d < bd:
+							bd = d
+							best = o
+				if best:
+					b.hear(best)
 	for a in radar_pings.keys():
 		radar_pings[a] -= delta
 		if radar_pings[a] <= 0.0 or not is_instance_valid(a):

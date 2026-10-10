@@ -33,6 +33,8 @@ func _ready() -> void:
 			var nt: Node = load("res://tests/net_test.gd").new()
 			nt.role = mode.substr(4)
 			get_tree().root.add_child.call_deferred(nt)
+		"dom":
+			get_tree().root.add_child.call_deferred(load("res://tests/dom_test.gd").new())
 		"squad":
 			get_tree().root.add_child.call_deferred(load("res://tests/squad_test.gd").new())
 		"vehicle":

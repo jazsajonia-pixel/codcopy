@@ -1,6 +1,6 @@
 class_name MatchRules
 extends RefCounted
-## Pure scoring/timer rules for Team Deathmatch and Free-For-All (no nodes: unit-testable).
+## Pure scoring/timer rules for Team Deathmatch, Domination and Free-For-All (no nodes: unit-testable).
 
 signal finished(winner_team: int)
 
@@ -29,6 +29,8 @@ func setup(p_mode: String, p_score_limit: int, p_time_limit: float) -> void:
 func register_kill(killer_team: int, victim_team: int, killer_id: int) -> void:
 	if over:
 		return
+	if mode == "dom":
+		return   # Domination scores from flags (add_points), not kills
 	if mode == "tdm":
 		if killer_team >= 0 and killer_team != victim_team:
 			team_scores[killer_team] = team_scores.get(killer_team, 0) + 1
@@ -41,6 +43,16 @@ func register_kill(killer_team: int, victim_team: int, killer_id: int) -> void:
 				_end(killer_team)
 
 
+## Domination: award objective points to a team.
+func add_points(team: int, n: int) -> void:
+	if over or team < 0:
+		return
+	team_scores[team] = team_scores.get(team, 0) + n
+	if team_scores[team] >= score_limit:
+		team_scores[team] = score_limit
+		_end(team)
+
+
 func tick(delta: float) -> void:
 	if over:
 		return
@@ -50,7 +62,7 @@ func tick(delta: float) -> void:
 
 
 func leader() -> int:
-	if mode == "tdm":
+	if mode != "ffa":
 		if team_scores[0] == team_scores[1]:
 			return -1
 		return 0 if team_scores[0] > team_scores[1] else 1

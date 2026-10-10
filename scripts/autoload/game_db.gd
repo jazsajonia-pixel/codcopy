@@ -83,6 +83,7 @@ const SKINS := {
 
 const MP_MODES := {
 	"tdm": {"name": "Team Deathmatch", "desc": "5v5. First team to the score limit wins.", "score_limit": 40, "time_limit": 480.0, "team_size": 5},
+	"dom": {"name": "Domination", "desc": "5v5. Capture and hold flags A, B and C. Each held flag scores a point every 2 seconds.", "score_limit": 100, "time_limit": 600.0, "team_size": 5},
 	"ffa": {"name": "Free-For-All", "desc": "Every operator for themselves. First to 20 kills.", "score_limit": 20, "time_limit": 480.0, "players": 8},
 }
 
