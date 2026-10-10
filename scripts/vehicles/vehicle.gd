@@ -146,6 +146,13 @@ func driver() -> Actor:
 	return seats[0] if seats.size() > 0 else null
 
 
+func free_passenger_seat() -> int:
+	for i in range(1, seats.size()):
+		if seats[i] == null:
+			return i
+	return -1
+
+
 func free_seat() -> int:
 	for i in seats.size():
 		if seats[i] == null:

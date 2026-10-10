@@ -26,6 +26,7 @@ var end_timer := -1.0
 var zone_tick := 0.0
 var time_scale := 1.0
 var _isla: GameMap
+var squad_size := 1
 
 
 func _ready() -> void:
@@ -43,8 +44,11 @@ func _ready() -> void:
 	player.inv.melee = SaveManager.current_loadout().get("melee", "knife")
 	player.equip_current()
 	var n := MatchConfig.br_players
+	squad_size = clampi(MatchConfig.br_squad_size, 1, 4)
 	for i in n - 1:
-		var b := spawn_bot(i + 1)
+		var b := spawn_bot((i + 1) / squad_size)
+		if b.team == player.team:
+			b.leader = player
 		b.br_mode = true
 		b.regen_enabled = false
 		b.inv.use_ammo_pools = true
@@ -53,6 +57,10 @@ func _ready() -> void:
 		b.set_physics_process(false)
 		b.visible = false
 	player.team = 0
+	if squad_size > 1:
+		for a in actors:
+			a.can_be_downed = true
+			a.down_check = _can_be_downed
 	_spawn_loot()
 	_spawn_vehicles()
 	_build_zone()
@@ -66,7 +74,10 @@ func _ready() -> void:
 	player.yaw = atan2(-fdir.x, -fdir.z)
 	player.pitch = deg_to_rad(-12.0)
 	player.global_position = plane_from + Vector3.UP * 6.0
-	announcement.emit("BATTLE ROYALE", "%d operators. Last one standing wins." % n)
+	if squad_size > 1:
+		announcement.emit("BATTLE ROYALE", "%d squads of %d. Last squad standing wins." % [team_count(), squad_size])
+	else:
+		announcement.emit("BATTLE ROYALE", "%d operators. Last one standing wins." % n)
 	AudioManager.play_2d("res://assets/audio/ambience/wind.ogg", -14.0)
 
 
@@ -249,7 +260,7 @@ func _tick_plane(delta: float) -> void:
 		if wants_jump or plane_t >= 0.97:
 			_drop_player()
 	for b in bots:
-		if not b.visible and plane_t >= bot_drop_t[b]:
+		if not b.visible and plane_t >= bot_drop_t[b] and b.team != player.team:
 			_drop_bot(b)
 	if plane_t >= 1.0:
 		for b in bots:
@@ -270,6 +281,11 @@ func _drop_player() -> void:
 	player.velocity = Vector3.ZERO
 	player.allow_input = true
 	AudioManager.play_2d("res://assets/audio/ambience/wind.ogg", -6.0)
+	# AI teammates jump with the player and follow them down.
+	for b in bots:
+		if b.team == player.team and not b.visible:
+			_drop_bot(b)
+			b.drop_target = player.global_position
 
 
 func _drop_bot(b: Bot) -> void:
@@ -292,6 +308,7 @@ func _tick_active(delta: float) -> void:
 	zone.tick(delta)
 	if not player_dropped:
 		_drop_player()
+	_update_squad(delta)
 	_update_player_chute()
 	zone_tick -= delta
 	if zone_tick <= 0.0:
@@ -302,10 +319,9 @@ func _tick_active(delta: float) -> void:
 				if a == player:
 					AudioManager.play_2d("res://assets/audio/sfx/zone_warning.ogg", -10.0)
 	if phase == Phase.ACTIVE:
-		var alive := alive_count()
-		if not player.alive:
+		if not team_alive(player.team):
 			_game_over(false)
-		elif alive <= 1:
+		elif alive_teams() <= 1:
 			_game_over(true)
 
 
@@ -366,8 +382,9 @@ func on_kill(victim: Actor, _killer: Actor) -> void:
 		var lh := LootItem.make("heal", "medkit", victim.inv.heals.medkit)
 		add_child(lh)
 		lh.global_position = victim.global_position + Vector3(0, 0.2, -1.3)
-	if victim == player:
-		placement = alive_count() + 1
+	_check_wipe(victim.team)
+	if victim.team == player.team and not team_alive(player.team) and placement == 0:
+		placement = alive_teams() + 1
 	# Bodies disappear after a while to keep the scene light.
 	if victim is Bot:
 		get_tree().create_timer(8.0, false).timeout.connect(func(): if is_instance_valid(victim) and not victim.alive: victim.visible = false)
@@ -379,20 +396,84 @@ func _game_over(won: bool) -> void:
 	end_timer = 4.0 * (0.5 if MatchConfig.fast_test else 1.0)
 	if won:
 		placement = 1
-		announcement.emit("VICTORY", "Last operator standing")
+		announcement.emit("VICTORY", "Last squad standing" if squad_size > 1 else "Last operator standing")
 	else:
 		if placement == 0:
-			placement = alive_count() + 1
-		announcement.emit("ELIMINATED", "You placed #%d of %d" % [placement, actors.size()])
+			placement = alive_teams() + 1
+		announcement.emit("SQUAD ELIMINATED" if squad_size > 1 else "ELIMINATED", "You placed #%d of %d" % [placement, team_count()])
 	player.allow_input = false
 
 
 func _finish() -> void:
 	var res := player_stats()
-	res.merge({"mode": "br", "map": "isla", "won": placement == 1, "placement": placement, "players": actors.size(),
-		"scoreboard": scoreboard(), "duration": elapsed})
-	res.score = res.score + maxi(0, (actors.size() - placement) * 40)
+	res.merge({"mode": "br", "map": "isla", "won": placement == 1, "placement": placement, "players": team_count(),
+		"squad_size": squad_size, "scoreboard": scoreboard(), "duration": elapsed})
+	res.score = res.score + maxi(0, (team_count() - placement) * 40 * squad_size)
 	MatchConfig.finish_match(res)
+
+
+# ---------------- Squads ----------------
+
+## Down instead of dying only while another squad member is still standing.
+func _can_be_downed(a: Actor) -> bool:
+	for m in actors:
+		if m != a and m.team == a.team and m.alive and not m.downed:
+			return true
+	return false
+
+
+func on_knock(victim: Actor, _attacker: Actor) -> void:
+	_check_wipe(victim.team)
+
+
+## If nobody in the squad is standing, every downed member is eliminated.
+func _check_wipe(t: int) -> void:
+	if squad_size <= 1:
+		return
+	for m in actors:
+		if m.team == t and m.alive and not m.downed:
+			return
+	for m in actors.duplicate():
+		if m.team == t and m.alive and m.downed:
+			m.finish_off()
+
+
+func _update_squad(_delta: float) -> void:
+	# Parachuting teammates steer toward the player.
+	for b in bots:
+		if b.team == player.team and b.parachute:
+			b.drop_target = player.global_position + Vector3(b.get_instance_id() % 5 - 2, 0, (b.get_instance_id() / 5) % 5 - 2) * 2.0
+	# Spectate a living teammate after the player is eliminated.
+	if not player.alive:
+		var st := player.spectate_target
+		if st == null or not is_instance_valid(st) or not st.alive:
+			player.spectate_target = null
+			for m in actors:
+				if m != player and m.team == player.team and m.alive:
+					player.spectate_target = m
+					break
+
+
+func team_alive(t: int) -> bool:
+	for a in actors:
+		if a.team == t and a.alive:
+			return true
+	return false
+
+
+func alive_teams() -> int:
+	var teams := {}
+	for a in actors:
+		if a.alive:
+			teams[a.team] = true
+	return teams.size()
+
+
+func team_count() -> int:
+	var teams := {}
+	for a in actors:
+		teams[a.team] = true
+	return teams.size()
 
 
 # ---------------- Queries used by bots / HUD ----------------
@@ -442,6 +523,8 @@ func plane_info() -> Dictionary:
 
 func br_status() -> String:
 	var s := "ALIVE %d    KILLS %d" % [alive_count(), player.kills]
+	if squad_size > 1:
+		s = "SQUADS %d    ALIVE %d    KILLS %d" % [alive_teams(), alive_count(), player.kills]
 	if phase == Phase.BOARDING:
 		return s + "    Boarding %ds" % ceili(boarding)
 	if phase == Phase.PLANE:

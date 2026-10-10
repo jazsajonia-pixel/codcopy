@@ -27,8 +27,10 @@ func _ready() -> void:
 		"unit":
 			await _unit()
 			_finish()
-		"tdm", "ffa", "br", "touch":
+		"tdm", "ffa", "br", "br_squad", "touch":
 			_start_match_test()
+		"squad":
+			get_tree().root.add_child.call_deferred(load("res://tests/squad_test.gd").new())
 		"vehicle":
 			get_tree().root.add_child.call_deferred(load("res://tests/vehicle_test.gd").new())
 		"flow":
@@ -220,6 +222,14 @@ func _menus() -> void:
 	lp._select_slot("primary")
 	lp._choose("smg_kr")
 	check(SaveManager.current_loadout().primary == "smg_kr", "loadout weapon selection saved")
+	# BR page: the squad buttons set the squad size used by the next match.
+	menu.show_page("br")
+	await get_tree().process_frame
+	var bp: Node = menu.content.get_child(menu.content.get_child_count() - 1)
+	bp.squad_buttons[4].pressed.emit()
+	check(MatchConfig.br_squad_size == 4 and bp.squad_buttons[4].button_pressed, "BR SQUAD button selects squads of 4")
+	bp.squad_buttons[1].pressed.emit()
+	check(MatchConfig.br_squad_size == 1, "BR SOLO button selects solo")
 	# LAN lobby host/leave (real ENet socket on localhost).
 	var err := NetworkManager.host(24999)
 	check(err == OK and NetworkManager.is_online(), "LAN host starts")
@@ -242,15 +252,16 @@ func _menus() -> void:
 
 func _start_match_test() -> void:
 	var watcher: Node = load("res://tests/match_watcher.gd").new()
-	watcher.mode = mode
+	watcher.mode = "br" if mode == "br_squad" else mode
 	watcher.name = "MatchWatcher"
 	get_tree().root.add_child.call_deferred(watcher)
 	MatchConfig.fast_test = true
 	MatchConfig.autoplay_player = mode != "touch"
 	SaveManager.set_setting("bots", "difficulty", "normal")
-	if mode == "br":
+	if mode == "br" or mode == "br_squad":
 		MatchConfig.configure_br()
-		MatchConfig.br_players = 10
+		MatchConfig.br_players = 12 if mode == "br_squad" else 10
+		MatchConfig.br_squad_size = 4 if mode == "br_squad" else 1
 	else:
 		MatchConfig.configure_mp("ffa" if mode == "ffa" else "tdm", "crossroads" if mode == "ffa" else "outpost")
 		MatchConfig.score_limit = 12 if mode == "tdm" else 6

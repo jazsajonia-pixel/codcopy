@@ -35,6 +35,9 @@ var scoreboard_list: VBoxContainer
 var fps_label: Label
 var hint_label: Label
 var streak_label: Label
+var squad_label: Label
+var status_label: Label
+var _last_revive: Actor = null
 var streak_t := 0.0
 
 
@@ -138,6 +141,9 @@ func _build_bottom() -> void:
 	root.add_child(equip_label)
 	hint_label = UITheme.shadowed(UITheme.label("", 15, UITheme.MUTED))
 	root.add_child(hint_label)
+	squad_label = UITheme.shadowed(UITheme.label("", 14, UITheme.FRIENDLY))
+	squad_label.visible = false
+	root.add_child(squad_label)
 
 
 func _build_center() -> void:
@@ -157,6 +163,9 @@ func _build_center() -> void:
 	root.add_child(announce_sub)
 	streak_label = UITheme.shadowed(UITheme.label("", 26, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
 	root.add_child(streak_label)
+	status_label = UITheme.shadowed(UITheme.label("", 24, UITheme.ENEMY, HORIZONTAL_ALIGNMENT_CENTER))
+	status_label.visible = false
+	root.add_child(status_label)
 	death_panel = Control.new()
 	death_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	death_panel.visible = false
@@ -255,6 +264,8 @@ func _layout() -> void:
 	killfeed.position = Vector2(s.end.x - 430, s.position.y + 70)
 	killfeed.size = Vector2(414, 200)
 	fps_label.position = s.position + Vector2(20, mm + 22)
+	squad_label.position = s.position + Vector2(18, mm + 42)
+	squad_label.size = Vector2(150, 80)
 	var bw := clampf(s.size.x * 0.24, 220, 360)
 	health_bar.position = Vector2(s.position.x + s.size.x * 0.5 - bw * 0.5, s.end.y - 46)
 	health_bar.size = Vector2(bw, 14)
@@ -291,6 +302,8 @@ func _layout() -> void:
 	announce_sub.size = Vector2(s.size.x, 30)
 	streak_label.position = Vector2(s.position.x, c.y - 120)
 	streak_label.size = Vector2(s.size.x, 34)
+	status_label.position = Vector2(s.position.x, c.y + 130)
+	status_label.size = Vector2(s.size.x, 64)
 	death_panel.position = Vector2.ZERO
 	death_panel.size = vs
 	death_label.position = Vector2(0, vs.y * 0.3)
@@ -429,6 +442,7 @@ func _process(delta: float) -> void:
 	use_bar.visible = player.using_item != ""
 	if use_bar.visible:
 		use_bar.value = (1.0 - player.use_left / maxf(player.use_total, 0.01)) * 100.0
+	_update_squad()
 	# Score / timer
 	if match_node.has_method("score_text"):
 		var st: Array = match_node.score_text()
@@ -443,7 +457,9 @@ func _process(delta: float) -> void:
 			br_label.text = match_node.br_status()
 	# Death
 	death_panel.visible = not player.alive and not match_node.ended
-	if death_panel.visible:
+	if death_panel.visible and player.spectate_target and is_instance_valid(player.spectate_target) and player.spectate_target.alive:
+		death_label.text = "SQUAD STILL IN THE FIGHT\nSpectating %s" % player.spectate_target.actor_name
+	elif death_panel.visible:
 		var killer := player.death_cam_target
 		var who := killer.actor_name if killer and is_instance_valid(killer) and killer != player else "the zone"
 		death_label.text = "ELIMINATED BY %s" % who.to_upper()
@@ -456,6 +472,49 @@ func _process(delta: float) -> void:
 		fps_label.text = "FPS %d" % Engine.get_frames_per_second()
 	if scoreboard_panel.visible:
 		_refresh_scoreboard()
+
+
+## Squad panel, downed status and revive prompts (Battle Royale duos/squads).
+func _update_squad() -> void:
+	var mates: Array = []
+	for a in match_node.actors:
+		if a != player and is_instance_valid(a) and a.team == player.team:
+			mates.append(a)
+	squad_label.visible = not mates.is_empty()
+	if squad_label.visible:
+		var lines: Array = []
+		for a in mates:
+			var st := "%d HP" % ceili(a.health)
+			if not a.alive:
+				st = "OUT"
+			elif a.downed:
+				st = "DOWNED"
+			lines.append("%s  %s" % [a.actor_name, st])
+		squad_label.text = "SQUAD\n" + "\n".join(lines)
+	# Downed / revive status
+	status_label.visible = false
+	if player.alive and player.downed:
+		status_label.visible = true
+		if player.reviver and player.revive_progress > 0.0:
+			status_label.text = "BEING REVIVED BY %s" % player.reviver.actor_name.to_upper()
+			use_bar.visible = true
+			use_bar.value = player.revive_progress * 100.0
+		else:
+			status_label.text = "YOU ARE DOWN  -  bleeding out (%d)\nCrawl to cover and wait for a teammate" % ceili(player.health / Actor.DOWN_HEALTH * Actor.BLEED_TIME)
+	var rt := player.revive_target
+	if rt and is_instance_valid(rt) and rt.downed and player.vehicle == null:
+		if rt.revive_progress > 0.0 and rt.reviver == player:
+			interact_label.text = "Reviving %s" % rt.actor_name
+			use_bar.visible = true
+			use_bar.value = rt.revive_progress * 100.0
+		else:
+			interact_label.text = "Hold to revive %s" % rt.actor_name + ("" if player.touch_mode else "  [F]")
+		if _last_revive != rt:
+			touch.set_interact_available(true, "REVIVE")
+	elif _last_revive != null:
+		var it: Variant = player.interact_target
+		_on_interact_target(it if is_instance_valid(it) else null)
+	_last_revive = rt if rt and is_instance_valid(rt) and rt.downed and player.vehicle == null else null
 
 
 func _refresh_scoreboard() -> void:

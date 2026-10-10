@@ -8,9 +8,26 @@ signal damaged(amount: float, from_pos: Vector3, attacker: Actor)
 signal shot_fired(actor: Actor, suppressed: bool)
 signal hit_confirmed(headshot: bool, killed: bool)
 signal item_used(item_id: String)
+signal knocked(victim: Actor, attacker: Actor, weapon_name: String)
+signal revived(victim: Actor, reviver: Actor)
 
 const HEIGHT := 1.8
 const CROUCH_HEIGHT := 1.15
+const DOWNED_HEIGHT := 0.9
+const DOWN_HEALTH := 100.0     ## "bleed" health while knocked down
+const BLEED_TIME := 30.0       ## seconds until a downed operator dies on their own
+const REVIVE_TIME := 4.0       ## seconds a teammate must hold interact
+const REVIVE_HEALTH := 35.0
+
+## Squad knock-down state (Battle Royale duos/squads). Solo and Multiplayer never enable it.
+var can_be_downed := false
+var down_check := Callable()   ## optional: returns false if this actor must die instead (squad wiped)
+var downed := false
+var knocked_by: Actor = null
+var knocked_weapon := ""
+var revive_progress := 0.0
+var reviver: Actor = null
+var _revive_touch := 0.0
 const RADIUS := 0.38
 const GRAVITY := 22.0
 
@@ -129,16 +146,77 @@ func take_damage(amount: float, attacker: Actor, weapon_name: String = "", heads
 	_cancel_use()
 	damaged.emit(amount, from_pos, attacker)
 	if health <= 0.0:
+		if can_be_downed and not downed and (not down_check.is_valid() or down_check.call(self)):
+			_knock(attacker, weapon_name)
+			return false
 		health = 0.0
-		_die(attacker, weapon_name, headshot)
+		_die(attacker if attacker else knocked_by, weapon_name if attacker else knocked_weapon, headshot)
 		return true
 	return false
+
+
+func _knock(attacker: Actor, weapon_name: String) -> void:
+	if vehicle and is_instance_valid(vehicle):
+		vehicle.exit(self)
+	downed = true
+	health = DOWN_HEALTH
+	armor = 0.0
+	knocked_by = attacker
+	knocked_weapon = weapon_name
+	revive_progress = 0.0
+	_cancel_use()
+	for w in inv.weapons:
+		if w:
+			w.cancel_reload()
+	set_height(DOWNED_HEIGHT)
+	_on_knocked()
+	knocked.emit(self, attacker, weapon_name)
+
+
+## A teammate holds interact on this downed actor. Returns true when the revive completes.
+func revive_tick(by: Actor, delta: float) -> bool:
+	if not downed or not alive or by == null or not by.alive or by.downed or by.is_enemy(self):
+		return false
+	if reviver != null and reviver != by and _revive_touch > 0.0 and is_instance_valid(reviver):
+		return false   # someone else is already reviving; no stacking
+	reviver = by
+	_revive_touch = 0.25
+	revive_progress += delta / REVIVE_TIME
+	if revive_progress < 1.0:
+		return false
+	downed = false
+	revive_progress = 0.0
+	reviver = null
+	health = REVIVE_HEALTH
+	knocked_by = null
+	set_height(HEIGHT)
+	by.score += 50
+	_on_revived()
+	revived.emit(self, by)
+	return true
+
+
+## Kill a downed actor outright (e.g. the rest of the squad was eliminated).
+func finish_off() -> void:
+	if alive and downed:
+		health = 0.0
+		_die(knocked_by, knocked_weapon if knocked_weapon != "" else "Bled out", false)
+
+
+func _on_knocked() -> void:
+	pass
+
+
+func _on_revived() -> void:
+	pass
 
 
 func _die(killer: Actor, weapon_name: String, headshot: bool) -> void:
 	if vehicle and is_instance_valid(vehicle):
 		vehicle.exit(self)
 	alive = false
+	downed = false
+	revive_progress = 0.0
 	deaths += 1
 	streak = 0
 	velocity = Vector3.ZERO
@@ -236,6 +314,17 @@ func tick_common(delta: float) -> void:
 	var w := inv.active()
 	if w:
 		w.tick(delta)
+	if downed and alive:
+		if _revive_touch > 0.0:
+			_revive_touch -= delta     # being revived: bleed-out pauses
+		else:
+			revive_progress = 0.0
+			reviver = null
+			health -= DOWN_HEALTH / BLEED_TIME * delta
+			if health <= 0.0:
+				health = 0.0
+				_die(knocked_by, knocked_weapon if knocked_weapon != "" else "Bled out", false)
+				return
 	if using_item != "":
 		use_left -= delta
 		if use_left <= 0.0:
@@ -247,7 +336,7 @@ func tick_common(delta: float) -> void:
 ## Fire the active weapon if possible. `trigger` is the held state this frame.
 func process_trigger(trigger: bool, origin: Vector3, dir: Vector3, muzzle: Vector3, ads: bool, moving: bool) -> Dictionary:
 	var w := inv.active()
-	if w == null or not alive or using_item != "":
+	if w == null or not alive or downed or using_item != "":
 		return {}
 	if not w.try_fire(trigger):
 		if trigger and w.mag == 0 and not w.reloading:
@@ -284,7 +373,7 @@ func _on_reload_started(w: WeaponInstance) -> void:
 
 
 func do_melee(origin: Vector3, dir: Vector3) -> bool:
-	if melee_cooldown > 0.0 or not alive:
+	if melee_cooldown > 0.0 or not alive or downed:
 		return false
 	var m: Dictionary = GameDB.MELEE.get(inv.melee, GameDB.MELEE.knife)
 	melee_cooldown = m.cooldown
@@ -294,7 +383,7 @@ func do_melee(origin: Vector3, dir: Vector3) -> bool:
 
 ## kind: "lethal" | "tactical". Returns true if thrown.
 func throw_equipment(kind: String, origin: Vector3, dir: Vector3) -> bool:
-	if equip_cooldown > 0.0 or not alive:
+	if equip_cooldown > 0.0 or not alive or downed:
 		return false
 	var eid := inv.lethal if kind == "lethal" else inv.tactical
 	var count := inv.lethal_count if kind == "lethal" else inv.tactical_count
@@ -317,7 +406,7 @@ func throw_equipment(kind: String, origin: Vector3, dir: Vector3) -> bool:
 # ---------------- Items (BR) ----------------
 
 func start_use(item_id: String) -> bool:
-	if using_item != "" or not alive:
+	if using_item != "" or not alive or downed:
 		return false
 	var it: Dictionary = GameDB.BR_ITEMS.get(item_id, {})
 	if it.is_empty():

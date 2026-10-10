@@ -270,7 +270,9 @@ func _press(id: String) -> void:
 		"lethal": inp.lethal = true
 		"tactical": inp.tactical = true
 		"melee": inp.melee = true
-		"interact": inp.interact = true
+		"interact":
+			inp.interact = true
+			inp.interact_held = true
 		"heal": inp.heal = true
 		"plate": inp.plate = true
 		"sprint": inp.sprint_toggle = true
@@ -291,6 +293,8 @@ func _release(id: String) -> void:
 				if f.kind == "btn" and f.id in ["fire", "fire_left"]:
 					still = true
 			player.input.fire = still
+		"interact":
+			player.input.interact_held = false
 		"ads":
 			if SaveManager.get_setting("controls", "ads_mode", "toggle") == "hold":
 				player.ads_on = false

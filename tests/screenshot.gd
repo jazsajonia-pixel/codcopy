@@ -57,6 +57,13 @@ func _ready() -> void:
 			MatchConfig.configure_br()
 			MatchConfig.br_players = 8
 			shots = [[16.0, "drive_a"], [18.5, "drive_b"]]
+		"squad":
+			MatchConfig.autoplay_player = true
+			MatchConfig.fast_test = true
+			MatchConfig.configure_br()
+			MatchConfig.br_players = 12
+			MatchConfig.br_squad_size = 4
+			shots = [[17.0, "squad_downed"], [19.5, "squad_revive"]]
 		"results":
 			MatchConfig.last_results = {"mode": "tdm", "won": true, "kills": 12, "deaths": 4, "assists": 3, "score": 1450, "headshots": 4, "accuracy": 0.31,
 				"team_scores": {0: 40, 1: 33}, "duration": 312.0, "rewards": {"xp": 1850, "credits": 270, "levels": [9]},
@@ -100,6 +107,21 @@ func _process(delta: float) -> void:
 			if p.vehicle:
 				p.input.move = Vector2(-0.25, -1.0)
 				p.input.look = Vector2.ZERO
+	if what == "squad":
+		var m2 = get_tree().current_scene
+		if m2 and m2.get("squad_size") and m2.player and m2.player.parachute_state == 0 and m2.phase >= 2 and m2.player.is_on_floor():
+			var p2: Player = m2.player
+			if not has_meta("knocked") and t > 13.0:
+				set_meta("knocked", true)
+				MatchConfig.autoplay_player = false
+				for a in m2.actors:
+					if a.team != p2.team and a is Bot:
+						a.set_physics_process(false)
+						a.global_position.y += 300.0
+				p2.take_damage(500.0, null, "Test")
+				p2.yaw += 2.6
+			if p2.downed:
+				p2.input.look = Vector2.ZERO
 	if idx < shots.size() and t >= shots[idx][0]:
 		var img := get_viewport().get_texture().get_image()
 		var p: String = dir.path_join(shots[idx][1] + ".png")

@@ -18,6 +18,7 @@ var lethal := false
 var tactical := false
 var melee := false
 var interact := false
+var interact_held := false      ## held state (revive), not cleared per tick
 var heal := false
 var plate := false
 var touch_sprint := false       ## joystick pushed fully forward (auto sprint)

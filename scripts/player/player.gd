@@ -40,6 +40,8 @@ var step_accum := 0.0
 var was_on_floor := true
 var land_dip := 0.0
 var interact_target: Node = null
+var revive_target: Actor = null     ## downed teammate in reach (hold interact to revive)
+var spectate_target: Actor = null   ## teammate followed after death (squads)
 var _interact_scan := 0.0
 var aim_assist_target: Actor = null
 var death_cam_target: Actor = null
@@ -138,6 +140,8 @@ func _poll_keyboard() -> void:
 	var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	input.fire = Input.is_action_pressed("fire") and (captured or Input.get_connected_joypads().size() > 0)
 	input.sprint_held = Input.is_action_pressed("sprint")
+	if not touch_mode:
+		input.interact_held = Input.is_action_pressed("interact")
 	if SaveManager.get_setting("controls", "ads_mode", "toggle") == "hold":
 		input.ads_held = Input.is_action_pressed("ads")
 
@@ -186,6 +190,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if input.jump:
 		_jump_at = Time.get_ticks_msec()
+	view_model.visible = not downed
 	view_model.use_item = using_item
 	view_model.use_progress = 1.0 - use_left / maxf(use_total, 0.01) if using_item != "" else 0.0
 	_apply_look(delta)
@@ -193,6 +198,11 @@ func _physics_process(delta: float) -> void:
 	_move(delta)
 	_handle_weapon(delta)
 	_scan_interact(delta)
+	if revive_target and input.interact_held and not downed:
+		if not revive_target.downed or not revive_target.alive or revive_target.global_position.distance_to(global_position) > 2.6:
+			revive_target = null
+		else:
+			revive_target.revive_tick(self, delta)
 	input.clear_pressed()
 
 
@@ -318,7 +328,7 @@ func _handle_actions() -> void:
 			start_use(h)
 	if input.plate:
 		start_use("plate")
-	if input.interact and interact_target and is_instance_valid(interact_target):
+	if input.interact and interact_target and is_instance_valid(interact_target) and revive_target == null and not downed:
 		interact_target.interact(self)
 		interact_target = null
 		interact_target_changed.emit(null)
@@ -338,8 +348,13 @@ func _move(delta: float) -> void:
 	var want_sprint := (input.sprint_held or input.touch_sprint or sprint_latched) and forward_input
 	if not forward_input:
 		sprint_latched = false
-	if input.fire or ads_on or using_item != "":
+	if input.fire or ads_on or using_item != "" or downed:
 		want_sprint = false
+	if downed:
+		input.crouch = false
+		input.jump = false
+		crouching = false
+		sliding = false
 	# Crouch / slide
 	if input.crouch:
 		if sprinting and on_floor and not sliding:
@@ -363,6 +378,8 @@ func _move(delta: float) -> void:
 		if slide_t <= 0.0 or not on_floor:
 			sliding = false
 	var target_h := CROUCH_HEIGHT if crouching or sliding else HEIGHT
+	if downed:
+		target_h = DOWNED_HEIGHT
 	if not is_equal_approx(current_height, target_h):
 		if target_h > current_height and _blocked_above():
 			crouching = true
@@ -383,6 +400,10 @@ func _move(delta: float) -> void:
 		speed *= ADS_SPEED_MULT
 	if using_item != "":
 		speed *= 0.5
+	if downed:
+		speed = 1.2   # crawl
+	elif revive_target and input.interact_held:
+		speed = 0.0   # kneeling to revive
 	var wish := (transform.basis * Vector3(input.move.x, 0, input.move.y))
 	wish.y = 0
 	wish = wish.limit_length(1.0)
@@ -442,7 +463,7 @@ func _handle_weapon(delta: float) -> void:
 	if w == null:
 		ads_blend = move_toward(ads_blend, 0.0, delta * 6.0)
 		return
-	var can_aim := ads_on and not sprinting and using_item == "" and parachute_state == 0
+	var can_aim := ads_on and not sprinting and using_item == "" and parachute_state == 0 and not downed
 	var ads_speed := 1.0 / maxf(float(w.stats.ads_time), 0.05)
 	ads_blend = move_toward(ads_blend, 1.0 if can_aim else 0.0, delta * ads_speed)
 	view_model.ads = ads_blend
@@ -495,6 +516,17 @@ func _scan_interact(delta: float) -> void:
 	if best != interact_target:
 		interact_target = best
 		interact_target_changed.emit(best)
+	var rv: Actor = null
+	if not downed:
+		var rd := 2.4
+		for n in get_tree().get_nodes_in_group("actors"):
+			var a: Actor = n
+			if a != self and a.alive and a.downed and not is_enemy(a):
+				var d := global_position.distance_to(a.global_position)
+				if d < rd:
+					rd = d
+					rv = a
+	revive_target = rv
 
 
 # ---------------- Death / respawn ----------------
@@ -514,12 +546,33 @@ func set_death_cam_target(killer: Actor) -> void:
 func _death_cam(delta: float) -> void:
 	death_time += delta
 	head.position.y = lerpf(head.position.y, 0.4, clampf(delta * 3.0, 0, 1))
+	if spectate_target and is_instance_valid(spectate_target) and spectate_target.alive:
+		var st := spectate_target
+		var back := Vector3(sin(st.rotation.y), 0, cos(st.rotation.y))
+		var want := st.global_position + back * 3.6 + Vector3.UP * 2.3
+		var tx := Transform3D(Basis(), want).looking_at(st.head_point() + Vector3.UP * 0.3, Vector3.UP)
+		camera.global_transform = camera.global_transform.interpolate_with(tx, clampf(delta * 6.0, 0, 1))
+		camera.fov = lerpf(camera.fov, base_fov, clampf(delta * 4.0, 0, 1))
+		return
 	if death_cam_target and is_instance_valid(death_cam_target) and death_cam_target != self:
 		var to := death_cam_target.head_point() - camera.global_position
 		if to.length() > 0.5:
 			var t := camera.global_transform.looking_at(death_cam_target.head_point(), Vector3.UP)
 			camera.global_transform = camera.global_transform.interpolate_with(t, clampf(delta * 3.0, 0, 1))
 	camera.fov = lerpf(camera.fov, base_fov, clampf(delta * 4.0, 0, 1))
+
+
+func _on_knocked() -> void:
+	ads_on = false
+	sprinting = false
+	sliding = false
+	crouching = false
+	sprint_latched = false
+	add_shake(0.6)
+
+
+func _on_revived() -> void:
+	AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -8.0, 1.3)
 
 
 func _on_respawned() -> void:

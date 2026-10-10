@@ -15,6 +15,7 @@ var time_limit := 480.0
 var team_size := 5
 var ffa_players := 8
 var br_players := 16
+var br_squad_size := 1        ## 1 solo, 2 duo, 4 squad (AI teammates)
 var bot_difficulty := "normal"
 var last_results := {}
 

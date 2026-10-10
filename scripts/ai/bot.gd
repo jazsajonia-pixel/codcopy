@@ -5,7 +5,7 @@ extends Actor
 ## Behaviour: patrol -> investigate -> engage (strafe/advance) -> retreat to cover at low HP.
 ## BR extras: parachute descent, loot seeking, healing, safe-zone awareness.
 
-enum State { PATROL, INVESTIGATE, ENGAGE, RETREAT, LOOT, ZONE, PARACHUTE, HEAL }
+enum State { PATROL, INVESTIGATE, ENGAGE, RETREAT, LOOT, ZONE, PARACHUTE, HEAL, DOWNED, REVIVE, FOLLOW, MOUNT }
 
 const NAMES := ["Hawk", "Bravo", "Kodiak", "Sable", "Rook", "Mako", "Jinx", "Talon", "Brick", "Dusk",
 	"Fang", "Grit", "Havoc", "Ivory", "Jolt", "Karma", "Lotus", "Maverick", "Nomad", "Onyx", "Pike",
@@ -48,6 +48,10 @@ var loot_target: Node3D = null
 var step_accum := 0.0
 var _rng := RandomNumberGenerator.new()
 var _ignored_loot := {}
+var leader: Actor = null          ## squad leader to stay near (the player's AI teammates)
+var revive_mate: Actor = null
+var _revive_near_t := 0.0     ## time spent close to the downed mate (widens reach if navigation can't get closer)
+var mount_vehicle: Vehicle = null
 
 
 func parachute_active() -> bool:
@@ -150,6 +154,12 @@ func _physics_process(delta: float) -> void:
 	if parachute:
 		_parachute(delta)
 		return
+	if vehicle:
+		# Passenger: ride along; leave when the squad leader gets out.
+		velocity = Vector3.ZERO
+		if leader == null or not is_instance_valid(leader) or leader.vehicle != vehicle:
+			vehicle.exit(self)
+		return
 	think_t -= delta
 	if think_t <= 0.0:
 		think_t = 0.2 + _rng.randf() * 0.08
@@ -161,8 +171,19 @@ func _physics_process(delta: float) -> void:
 
 
 func _think() -> void:
+	if downed:
+		target = null
+		state = State.DOWNED
+		return
 	_perceive()
 	var w := inv.active()
+	# Reviving a downed teammate beats finishing off a downed enemy, trading shots at range,
+	# or running from the zone edge (a revive takes only a few seconds).
+	var mate := _downed_teammate(40.0)
+	if mate:
+		revive_mate = mate
+		state = State.REVIVE
+		return
 	if br_mode and match_node and match_node.has_method("outside_zone") and match_node.outside_zone(global_position, 0.85):
 		if target == null or health < 50.0:
 			state = State.ZONE
@@ -182,9 +203,22 @@ func _think() -> void:
 		return
 	if br_mode and armor < max_armor and inv.plates > 0 and using_item == "":
 		start_use("plate")
+	# Squad duties: ride with the leader and stay close to them.
+	if leader and is_instance_valid(leader) and leader.alive:
+		var lv: Vehicle = leader.vehicle
+		if lv and lv.alive and lv.free_passenger_seat() > 0 and global_position.distance_to(lv.global_position) < 30.0:
+			mount_vehicle = lv
+			state = State.MOUNT
+			return
+		var ld := global_position.distance_to(leader.global_position)
+		if ld > 16.0:
+			state = State.FOLLOW
+			var off := Vector3(_rng.randf_range(-4, 4), 0, _rng.randf_range(-4, 4))
+			move_goal = NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, leader.global_position + off)
+			return
 	if w and w.mag < w.mag_size() * 0.5 and not w.reloading:
 		request_reload()
-	if br_mode:
+	if br_mode and not (leader and is_instance_valid(leader) and leader.alive and global_position.distance_to(leader.global_position) > 28.0):
 		var lt := _find_loot()
 		if lt:
 			loot_target = lt
@@ -225,7 +259,7 @@ func _perceive() -> void:
 				continue
 		if Effects.blocked_by_smoke(eye, a.aim_point()):
 			continue
-		var s := dist * (0.5 if a == target else 1.0)
+		var s := dist * (0.5 if a == target else 1.0) * (1.8 if a.downed else 1.0)
 		if s < best_score:
 			best_score = s
 			best = a
@@ -329,7 +363,7 @@ func _act(delta: float) -> void:
 		if crouch_t <= 0.0:
 			crouch_t = _rng.randf_range(2.0, 5.0)
 			set_height(CROUCH_HEIGHT if _rng.randf() < 0.25 and dist > 12.0 else HEIGHT)
-	elif current_height < HEIGHT and crouch_t <= 0.0:
+	elif current_height < HEIGHT and crouch_t <= 0.0 and not downed:
 		set_height(HEIGHT)
 	if w and w.mag == 0 and not w.reloading:
 		request_reload()
@@ -402,6 +436,51 @@ func _move(delta: float) -> void:
 			has_goal = false
 			if using_item == "":
 				state = State.PATROL
+		State.DOWNED:
+			# Crawl toward the nearest standing teammate (or just stay put).
+			var helper := _standing_teammate()
+			if helper and global_position.distance_to(helper.global_position) > 2.0:
+				goal = helper.global_position
+				speed = 2.0
+			else:
+				has_goal = false
+		State.REVIVE:
+			if revive_mate and is_instance_valid(revive_mate) and revive_mate.alive and revive_mate.downed:
+				goal = revive_mate.global_position
+				speed = 6.0
+				var rd := global_position.distance_to(goal)
+				_revive_near_t = _revive_near_t + delta if rd < 4.5 else 0.0
+				if rd < 1.7 or (_revive_near_t > 1.5 and rd < 4.5):
+					has_goal = false
+					var to_m := goal - global_position
+					to_m.y = 0
+					if to_m.length() > 0.1:
+						aim_dir = aim_dir.slerp(to_m.normalized(), 0.2).normalized()
+					if revive_mate.revive_tick(self, delta):
+						revive_mate = null
+						state = State.PATROL
+			else:
+				revive_mate = null
+				state = State.PATROL
+				has_goal = false
+		State.FOLLOW:
+			goal = move_goal
+			speed = 6.0
+			if global_position.distance_to(move_goal) < 3.0:
+				state = State.PATROL
+		State.MOUNT:
+			if mount_vehicle and is_instance_valid(mount_vehicle) and mount_vehicle.alive and leader and leader.vehicle == mount_vehicle:
+				goal = mount_vehicle.global_position
+				speed = 6.4
+				if global_position.distance_to(goal) < 4.5:
+					mount_vehicle.enter(self, mount_vehicle.free_passenger_seat())
+					mount_vehicle = null
+					state = State.PATROL
+					return
+			else:
+				mount_vehicle = null
+				state = State.PATROL
+				has_goal = false
 	var dir := Vector3.ZERO
 	if has_goal:
 		repath_t -= delta
@@ -474,6 +553,8 @@ func _animate() -> void:
 
 func _on_died() -> void:
 	name_tag.visible = false
+	model.rotation.x = 0.0
+	model.position.y = 0.0
 	if anim and anim.has_animation("die"):
 		cur_anim = "die"
 		anim.play("die", 0.1)
@@ -494,6 +575,53 @@ func _on_respawned() -> void:
 
 
 # ---------------- Helpers ----------------
+
+func _downed_teammate(max_d: float) -> Actor:
+	if target and target.alive and not target.downed and global_position.distance_to(target.global_position) < 20.0:
+		return null   # deal with a standing threat first
+	var best: Actor = null
+	var bd := max_d
+	for n in get_tree().get_nodes_in_group("actors"):
+		var a: Actor = n
+		if a != self and a.alive and a.downed and a.team == team:
+			var d := global_position.distance_to(a.global_position)
+			if d < bd:
+				bd = d
+				best = a
+	return best
+
+
+func _standing_teammate() -> Actor:
+	var best: Actor = null
+	var bd := 60.0
+	for n in get_tree().get_nodes_in_group("actors"):
+		var a: Actor = n
+		if a != self and a.alive and not a.downed and a.team == team:
+			var d := global_position.distance_to(a.global_position)
+			if d < bd:
+				bd = d
+				best = a
+	return best
+
+
+func _on_knocked() -> void:
+	state = State.DOWNED
+	target = null
+	burst_left = 0.0
+	model.rotation.x = deg_to_rad(-62.0)
+	model.position.y = 0.25
+	if gun_model:
+		gun_model.visible = false
+
+
+func _on_revived() -> void:
+	state = State.PATROL
+	model.rotation.x = 0.0
+	model.position.y = 0.0
+	cur_anim = ""
+	if gun_model:
+		gun_model.visible = true
+
 
 func _patrol_point() -> Vector3:
 	if match_node and match_node.has_method("random_patrol_point"):

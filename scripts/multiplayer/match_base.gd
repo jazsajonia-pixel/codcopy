@@ -71,6 +71,7 @@ func _unique_name() -> String:
 func _register(a: Actor) -> void:
 	actors.append(a)
 	a.died.connect(_on_actor_died)
+	a.knocked.connect(_on_actor_knocked)
 	a.shot_fired.connect(_on_shot_fired)
 
 
@@ -101,6 +102,19 @@ func _on_actor_died(victim: Actor, killer: Actor, weapon_name: String, headshot:
 		player.set_death_cam_target(killer)
 	kill_feed.emit(kname, victim.actor_name, weapon_name, headshot, inv)
 	on_kill(victim, killer)
+
+
+func _on_actor_knocked(victim: Actor, attacker: Actor, weapon_name: String) -> void:
+	var inv := 1 if attacker == player else (-1 if victim == player else 0)
+	if attacker:
+		attacker.score += 50
+	kill_feed.emit(attacker.actor_name if attacker else "", victim.actor_name + " (knocked)", weapon_name, false, inv)
+	on_knock(victim, attacker)
+
+
+## Override in subclasses.
+func on_knock(_victim: Actor, _attacker: Actor) -> void:
+	pass
 
 
 ## Override in subclasses.
