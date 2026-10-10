@@ -1,7 +1,7 @@
 extends Node
 ## Automated tests. Run headless from the project folder:
 ##   godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- unit
-##   godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- tdm | ffa | br | touch | menus
+##   godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- tdm | ffa | br | touch | menus | flow
 ## Exit code 0 = pass. Match tests drive the player with the bot AI ("autoplay") and short limits.
 
 var mode := "unit"
@@ -29,6 +29,9 @@ func _ready() -> void:
 			_finish()
 		"tdm", "ffa", "br", "touch":
 			_start_match_test()
+		"flow":
+			var ft: Node = load("res://tests/flow_test.gd").new()
+			get_tree().root.add_child.call_deferred(ft)
 		"menus":
 			await _menus()
 			_finish()
