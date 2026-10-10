@@ -43,19 +43,25 @@ func _ready() -> void:
 	v.add_child(tip)
 	AudioManager.stop_music()
 	path = MatchConfig.match_scene()
-	ResourceLoader.load_threaded_request(path)
+	# Synchronous load on the main thread. Threaded loading failed to compile the HUD script on real
+	# displays ("referenced non-existent resource hud.gd"), which left matches with no HUD/touch controls.
+	_load_after_frames.call_deferred()
+
+
+func _load_after_frames() -> void:
+	bar.value = 15.0
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var packed := load(path) as PackedScene
+	bar.value = 100.0
+	while _t < 0.6:
+		await get_tree().process_frame
+	if packed == null:
+		push_error("Failed to load " + path)
+		MatchConfig.to_menu()
+		return
+	get_tree().change_scene_to_packed(packed)
 
 
 func _process(delta: float) -> void:
 	_t += delta
-	var prog := []
-	var st := ResourceLoader.load_threaded_get_status(path, prog)
-	if prog.size() > 0:
-		bar.value = prog[0] * 100.0
-	if st == ResourceLoader.THREAD_LOAD_LOADED and _t > 0.6:
-		set_process(false)
-		get_tree().change_scene_to_packed(ResourceLoader.load_threaded_get(path))
-	elif st == ResourceLoader.THREAD_LOAD_FAILED or st == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-		set_process(false)
-		push_error("Failed to load " + path)
-		MatchConfig.to_menu()

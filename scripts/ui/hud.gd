@@ -313,6 +313,17 @@ func show_pause(p: bool) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+func _input(event: InputEvent) -> void:
+	# Safety net: a real finger touch while in keyboard mode switches to on-screen controls (unless the
+	# player explicitly chose Keyboard/Mouse). Covers devices that don't report a touchscreen up front.
+	if event is InputEventScreenTouch and event.pressed and player and not player.touch_mode \
+			and SaveManager.get_setting("controls", "scheme", "auto") != "keyboard":
+		player.touch_mode = true
+		touch.visible = not get_tree().paused
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_layout()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if get_tree().paused and event.is_action_pressed("pause"):
 		match_node.toggle_pause()
