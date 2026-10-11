@@ -40,6 +40,9 @@ func _ready() -> void:
 		"over":
 			MatchConfig.configure_mp(parts[2] if parts.size() > 2 else "tdm", parts[1])
 			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
+		"medal":
+			MatchConfig.configure_mp("tdm", "dockyard")
+			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
 		"scope":
 			MatchConfig.configure_mp("tdm", "outpost")
 			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
@@ -103,6 +106,23 @@ func _s_over(m, p: Player) -> void:
 		step = 1
 	elif step == 1 and t - st > 0.8:
 		snap(what.replace(":", "_"))
+		get_tree().quit()
+
+
+func _s_medal(m, p: Player) -> void:
+	if step == 0 and t > 4.0:
+		var mf: MedalFeed = m.hud.medal_feed
+		mf.medal("DOUBLE KILL", Color(1.0, 0.45, 0.2))
+		mf.medal("HEADSHOT", Color(1.0, 0.3, 0.25))
+		mf.medal("LONGSHOT", Color(0.4, 0.8, 1.0))
+		mf.popup("+100  ENEMY KILLED")
+		mf.popup("+50  DOUBLE KILL")
+		mf.popup("+50  HEADSHOT")
+		mf.eliminated("Viper [BOT]")
+		st = t
+		step = 1
+	elif step == 1 and t - st > 0.6:
+		snap("medal")
 		get_tree().quit()
 
 

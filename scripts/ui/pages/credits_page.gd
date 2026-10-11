@@ -5,7 +5,6 @@ var menu: Control
 
 
 func _ready() -> void:
-	add_child(UITheme.label("CREDITS", 34, UITheme.ACCENT))
 	var t := RichTextLabel.new()
 	t.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	t.bbcode_enabled = true

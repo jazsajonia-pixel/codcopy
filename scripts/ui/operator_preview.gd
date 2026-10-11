@@ -20,7 +20,7 @@ func _ready() -> void:
 	stage = Node3D.new()
 	vp.add_child(stage)
 	var cam := Camera3D.new()
-	cam.position = Vector3(0, 1.25, 4.2)
+	cam.position = Vector3(0, 1.05, 5.6)
 	cam.rotation_degrees.x = -6
 	cam.fov = 38
 	vp.add_child(cam)

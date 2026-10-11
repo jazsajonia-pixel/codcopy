@@ -8,8 +8,7 @@ var squad_hint: Label
 
 
 func _ready() -> void:
-	add_child(UITheme.label("BATTLE ROYALE", 34, UITheme.ACCENT))
-	var d := UITheme.label("Isla Verde - 400 m island, six points of interest, drivable vehicles. Jump from the aircraft, loot weapons, armor and supplies, and stay inside the shrinking safe zone. Play solo, or as a duo or squad with AI teammates who can revive you.", 17)
+	var d := UITheme.label("Isla Verde - 560 m island, nine points of interest, drivable vehicles and helicopters (Airfield, Military Base). Jump from the aircraft, loot weapons, armor and supplies, and stay inside the shrinking safe zone. Play solo, or as a duo or squad with AI teammates who can revive you.", 17)
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(d)
 	var cols := HBoxContainer.new()
@@ -46,9 +45,9 @@ func _ready() -> void:
 	var sp := Control.new()
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(sp)
-	var launch := UITheme.button("DEPLOY", func():
+	var launch := UITheme.cta("DEPLOY", func():
 		MatchConfig.configure_br()
-		MatchConfig.start_match(), Vector2(360, 80), "confirm")
+		MatchConfig.start_match(), Vector2(360, 88))
 	launch.size_flags_horizontal = Control.SIZE_SHRINK_END
 	add_child(launch)
 	_set_count(MatchConfig.br_players)

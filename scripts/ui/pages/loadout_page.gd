@@ -1,5 +1,6 @@
 extends VBoxContainer
-## Loadout editor: 3 saved loadouts; primary/secondary/melee/lethal/tactical; per-weapon attachments
+## Loadout editor (CODM style): 3 saved loadouts; Multiplayer rules = one primary gun + melee + lethal +
+## tactical (no secondary - Battle Royale weapons come from loot); per-weapon attachments
 ## and skins (all unlocked by level only - there are no paid items); stat bars with comparison.
 
 var menu: Control
@@ -10,6 +11,7 @@ var list_box: VBoxContainer
 var detail: VBoxContainer
 var name_edit: LineEdit
 var compare_stats := {}
+var preview: WeaponPreview
 
 
 func _lo() -> Dictionary:
@@ -23,7 +25,6 @@ func _level() -> int:
 func _ready() -> void:
 	var top := HBoxContainer.new()
 	add_child(top)
-	top.add_child(UITheme.label("LOADOUT", 34, UITheme.ACCENT))
 	for i in 3:
 		var b := UITheme.button(str(i + 1), func(): _select_loadout(i), Vector2(64, 56), "select")
 		b.toggle_mode = true
@@ -41,7 +42,9 @@ func _ready() -> void:
 	var slots := VBoxContainer.new()
 	slots.custom_minimum_size = Vector2(250, 0)
 	body.add_child(slots)
-	for s in ["primary", "secondary", "melee", "lethal", "tactical"]:
+	var rule := UITheme.label("MULTIPLAYER: 1 GUN + MELEE", 14, UITheme.ACCENT)
+	slots.add_child(rule)
+	for s in ["primary", "melee", "lethal", "tactical"]:
 		var b := UITheme.button("", func(): _select_slot(s), Vector2(250, 70), "select")
 		b.toggle_mode = true
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -58,10 +61,16 @@ func _ready() -> void:
 	dscroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(dscroll)
+	var dcol := VBoxContainer.new()
+	dcol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dscroll.add_child(dcol)
+	preview = WeaponPreview.new()
+	preview.custom_minimum_size = Vector2(0, 170)
+	dcol.add_child(preview)
 	detail = VBoxContainer.new()
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_theme_constant_override("separation", 6)
-	dscroll.add_child(detail)
+	dcol.add_child(detail)
 	_select_loadout(int(SaveManager.profile.loadout_index))
 
 
@@ -144,6 +153,14 @@ func _show_detail() -> void:
 	for c in detail.get_children():
 		c.queue_free()
 	var lo := _lo()
+	if preview:
+		match slot:
+			"primary", "secondary":
+				preview.show_model.call_deferred(GameDB.get_weapon(lo[slot]).model_path)
+			"melee":
+				preview.show_model.call_deferred(str(GameDB.MELEE[lo.melee].get("model", "")))
+			_:
+				preview.show_model.call_deferred("")
 	match slot:
 		"primary", "secondary":
 			_weapon_detail(lo[slot])

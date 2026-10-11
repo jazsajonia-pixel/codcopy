@@ -38,6 +38,8 @@ var scoreboard_list: VBoxContainer
 var fps_label: Label
 var hint_label: Label
 var streak_label: Label
+var medal_feed: MedalFeed
+var _kills_this_match := 0
 var squad_label: Label
 var flags_label: RichTextLabel
 var status_label: Label
@@ -184,6 +186,9 @@ func _build_center() -> void:
 	root.add_child(announce_sub)
 	streak_label = UITheme.shadowed(UITheme.label("", 26, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
 	root.add_child(streak_label)
+	streak_label.visible = false
+	medal_feed = MedalFeed.new()
+	root.add_child(medal_feed)
 	status_label = UITheme.shadowed(UITheme.label("", 24, UITheme.ENEMY, HORIZONTAL_ALIGNMENT_CENTER))
 	status_label.visible = false
 	root.add_child(status_label)
@@ -504,11 +509,32 @@ func _on_kill_feed(killer: String, victim: String, weapon: String, headshot: boo
 			o.queue_free())
 
 
-func _on_player_kill(_victim: Actor, headshot: bool) -> void:
+func _on_player_kill(victim: Actor, headshot: bool) -> void:
 	var s := player.streak
-	var names := {2: "DOUBLE KILL", 3: "TRIPLE KILL", 4: "FURY KILL", 5: "FRENZY", 7: "UNSTOPPABLE"}
-	streak_label.text = names.get(s, "HEADSHOT" if headshot else "ELIMINATED")
-	streak_t = 1.6
+	_kills_this_match += 1
+	var names := {2: "DOUBLE KILL", 3: "TRIPLE KILL", 4: "FURY KILL", 5: "FRENZY KILL", 6: "SUPER KILL", 7: "MEGA KILL", 8: "ULTRA KILL"}
+	medal_feed.popup("+100  ENEMY KILLED")
+	if names.has(s):
+		medal_feed.medal(names[s], Color(1.0, 0.45, 0.2))
+		medal_feed.popup("+%d  %s" % [50 * (s - 1), names[s]])
+	if headshot:
+		medal_feed.medal("HEADSHOT", Color(1.0, 0.3, 0.25))
+		medal_feed.popup("+50  HEADSHOT")
+	if _kills_this_match == 1 and MatchConfig.mode != "br":
+		medal_feed.medal("FIRST BLOOD", Color(0.9, 0.15, 0.15))
+	if victim and is_instance_valid(victim):
+		var d := victim.global_position.distance_to(player.global_position)
+		if d > 40.0:
+			medal_feed.medal("LONGSHOT", Color(0.4, 0.8, 1.0))
+			medal_feed.popup("+50  LONGSHOT")
+		elif d < 2.5:
+			medal_feed.medal("POINT BLANK", Color(0.6, 0.9, 0.4))
+		if victim.streak >= 3:
+			medal_feed.medal("BUZZKILL", Color(0.75, 0.5, 1.0))
+			medal_feed.popup("+50  BUZZKILL")
+		medal_feed.eliminated(victim.actor_name)
+	if s in [3, 5, 7]:
+		medal_feed.medal("%d KILL STREAK" % s, UITheme.ACCENT)
 
 
 func _process(delta: float) -> void:

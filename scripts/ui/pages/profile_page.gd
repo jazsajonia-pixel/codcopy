@@ -7,7 +7,6 @@ var confirm_reset := false
 
 func _ready() -> void:
 	var p := SaveManager.profile
-	add_child(UITheme.label("PROFILE", 34, UITheme.ACCENT))
 	var row := HBoxContainer.new()
 	add_child(row)
 	row.add_child(UITheme.label("Name", 20))

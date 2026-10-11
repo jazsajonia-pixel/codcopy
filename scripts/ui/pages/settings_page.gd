@@ -9,7 +9,6 @@ var tabs: TabContainer
 func _ready() -> void:
 	var top := HBoxContainer.new()
 	add_child(top)
-	top.add_child(UITheme.label("SETTINGS", 34, UITheme.ACCENT))
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(sp)
