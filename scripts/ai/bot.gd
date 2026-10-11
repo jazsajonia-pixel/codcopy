@@ -64,6 +64,8 @@ var _revive_near_t := 0.0     ## time spent close to the downed mate (widens rea
 var mount_vehicle: Vehicle = null
 
 
+var _last_body_yaw := 0.0
+
 func parachute_active() -> bool:
 	return parachute
 
@@ -609,9 +611,13 @@ func _animate() -> void:
 		mode = "downed"
 	elif parachute:
 		mode = "chute" if chute_open else "freefall"
+	var _yaw_now := global_rotation.y
+	var _turn := wrapf(_yaw_now - _last_body_yaw, -PI, PI) / maxf(get_physics_process_delta_time(), 0.001)
+	_last_body_yaw = _yaw_now
 	if mode != model.mode:
 		model.set_mode(mode)
 	model.update(get_physics_process_delta_time(), {
+		"turn_rate": _turn,
 		"speed": hs,
 		"on_floor": (_net_floor if puppet else is_on_floor()) or parachute,
 		"crouch": current_height < HEIGHT - 0.05,

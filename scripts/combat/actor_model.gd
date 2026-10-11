@@ -292,40 +292,110 @@ func _build_wings() -> void:
 	pose_root.add_child(wings)
 
 
+const CHUTE_A := 3.3      ## oval canopy half-span (m)
+const CHUTE_B := 1.45     ## oval canopy half-chord (m)
+const CHUTE_ARCH := 0.9   ## how far the wing tips droop below the centre
+const CHUTE_H := 4.3      ## canopy height above the feet
+var chute_canopy: Node3D
+var _chute_t := 9.0
+
+
+## Oval ram-air canopy: elliptical planform, arched span, upper + lower skin with alternating cell colours,
+## open leading edge, risers from the canopy edge down to the shoulders.
 func _build_chute() -> void:
 	chute = Node3D.new()
-	var canopy := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 2.6
-	sm.height = 2.0
-	sm.is_hemisphere = true
-	sm.radial_segments = 24
-	sm.rings = 8
-	canopy.mesh = sm
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.85, 0.55, 0.15)
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	canopy.material_override = m
-	canopy.position = Vector3(0, 4.4, 0)
-	chute.add_child(canopy)
+	chute_canopy = Node3D.new()
+	chute_canopy.position = Vector3(0, CHUTE_H, 0)
+	chute.add_child(chute_canopy)
+	var cols := [Color(0.95, 0.55, 0.12), Color(0.96, 0.93, 0.85)]
+	var mats := []
+	for c in cols:
+		var m := StandardMaterial3D.new()
+		m.albedo_color = c
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.roughness = 0.8
+		mats.append(m)
+	var cells := 9
+	var seg := 4
+	for cell in cells:
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for k in seg:
+			var u0 := lerpf(-1.0, 1.0, float(cell * seg + k) / (cells * seg))
+			var u1 := lerpf(-1.0, 1.0, float(cell * seg + k + 1) / (cells * seg))
+			for j in 6:
+				var v0 := lerpf(-1.0, 1.0, j / 6.0)
+				var v1 := lerpf(-1.0, 1.0, (j + 1) / 6.0)
+				for top in [true, false]:
+					var q := [_chute_pt(u0, v0, top), _chute_pt(u1, v0, top), _chute_pt(u1, v1, top), _chute_pt(u0, v1, top)]
+					st.add_vertex(q[0]); st.add_vertex(q[1]); st.add_vertex(q[2])
+					st.add_vertex(q[0]); st.add_vertex(q[2]); st.add_vertex(q[3])
+			# trailing edge closes the airfoil; the leading edge (front, -Z) stays open like real cells
+			var t0a := _chute_pt(u0, 1.0, true)
+			var t0b := _chute_pt(u0, 1.0, false)
+			var t1a := _chute_pt(u1, 1.0, true)
+			var t1b := _chute_pt(u1, 1.0, false)
+			st.add_vertex(t0a); st.add_vertex(t1a); st.add_vertex(t1b)
+			st.add_vertex(t0a); st.add_vertex(t1b); st.add_vertex(t0b)
+		st.generate_normals()
+		var mi := MeshInstance3D.new()
+		mi.mesh = st.commit()
+		mi.material_override = mats[cell % 2]
+		chute_canopy.add_child(mi)
+	# Risers: from points along the canopy underside to the shoulders (left / right groups)
 	var lm := StandardMaterial3D.new()
-	lm.albedo_color = Color(0.1, 0.1, 0.1)
-	for i in 6:
-		var ang := TAU * i / 6.0
-		var top := Vector3(cos(ang) * 2.4, 4.4, sin(ang) * 2.4)
-		var bottom := Vector3(0, 1.5, 0)
-		var line := MeshInstance3D.new()
-		var cm := CylinderMesh.new()
-		cm.top_radius = 0.015
-		cm.bottom_radius = 0.015
-		cm.height = top.distance_to(bottom)
-		cm.radial_segments = 4
-		line.mesh = cm
-		line.material_override = lm
-		line.position = (top + bottom) * 0.5
-		line.basis = Basis(Quaternion(Vector3.UP, (top - bottom).normalized()))
-		chute.add_child(line)
+	lm.albedo_color = Color(0.12, 0.12, 0.12)
+	for side in [-1.0, 1.0]:
+		var shoulder := Vector3(side * 0.22, 1.45, 0.0)
+		for u in [0.25, 0.6, 0.92]:
+			for v in [-0.6, 0.6]:
+				var top := _chute_pt(side * u, v, false) + Vector3(0, CHUTE_H, 0)
+				var line := MeshInstance3D.new()
+				var cm := CylinderMesh.new()
+				cm.top_radius = 0.012
+				cm.bottom_radius = 0.012
+				cm.height = top.distance_to(shoulder)
+				cm.radial_segments = 4
+				cm.rings = 1
+				line.mesh = cm
+				line.material_override = lm
+				line.position = (top + shoulder) * 0.5
+				line.basis = Basis(Quaternion(Vector3.UP, (top - shoulder).normalized()))
+				chute.add_child(line)
 	add_child(chute)
+
+
+## Canopy deploy + flight animation: the oval unfurls from a narrow bundle (span first, then chord), overshoots
+## slightly as it pressurises, then breathes and banks with the turn rate / swings with speed.
+func _animate_chute(delta: float, st: Dictionary) -> void:
+	if chute_canopy == null:
+		return
+	_chute_t += delta
+	var k := clampf(_chute_t / 1.1, 0.0, 1.0)
+	var span := 0.15 + 0.85 * ease(k, 0.4) + sin(k * PI) * 0.08
+	var chord := 0.2 + 0.8 * ease(clampf(k * 1.3 - 0.2, 0.0, 1.0), 0.5)
+	var breathe := 1.0 + sin(_chute_t * 2.3) * 0.015
+	chute_canopy.scale = Vector3(span * breathe, lerpf(0.4, 1.0, k), chord * breathe)
+	chute_canopy.position.y = lerpf(2.4, CHUTE_H, ease(k, 0.6))
+	var turn: float = st.get("turn_rate", 0.0)
+	var spd: float = st.get("speed", 0.0)
+	var bank := clampf(-turn * 0.18, -0.35, 0.35) + sin(_chute_t * 1.4) * 0.03
+	var pitch := clampf(spd * 0.012, 0.0, 0.14)
+	chute.rotation.z = lerp_angle(chute.rotation.z, bank, minf(delta * 3.0, 1.0))
+	chute.rotation.x = lerp_angle(chute.rotation.x, -pitch, minf(delta * 3.0, 1.0))
+
+
+## Point on the oval canopy. u = -1..1 across the span, v = -1 (leading edge, front) .. 1 (trailing edge).
+func _chute_pt(u: float, v: float, top: bool) -> Vector3:
+	var half_chord := CHUTE_B * sqrt(maxf(1.0 - u * u, 0.0)) + 0.05
+	var x := u * CHUTE_A
+	var z := v * half_chord
+	var arch := -CHUTE_ARCH * u * u
+	# Airfoil thickness: thickest a third back from the leading edge, zero at the trailing edge.
+	var tv := (v + 1.0) * 0.5
+	var thick := 0.32 * sqrt(maxf(1.0 - u * u, 0.05)) * (1.0 - tv) * clampf(tv * 4.0 + 0.35, 0.0, 1.0)
+	var y := arch + (thick if top else 0.0) + 0.08 * (1.0 - v * v)
+	return Vector3(x, y, z)
 
 
 func set_cast_shadows(on: bool) -> void:
@@ -365,6 +435,8 @@ func set_mode(m: String) -> void:
 	mode = m
 	wings.visible = m == "freefall"
 	chute.visible = m == "chute"
+	if m == "chute" and was != "chute":
+		_chute_t = 0.0
 	if gun_model:
 		gun_model.visible = m in ["ground", "chute"]
 	if m == "dead" and was != "dead":
@@ -453,6 +525,7 @@ func update(delta: float, st: Dictionary) -> void:
 			want_tilt = deg_to_rad(-78.0)
 		"chute":
 			loco = "fall"
+			_animate_chute(delta, st)
 		_:
 			if st.get("emote", false):
 				loco = "emote"

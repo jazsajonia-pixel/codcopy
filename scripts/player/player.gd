@@ -81,6 +81,8 @@ var on_target := false            ## crosshair currently over an enemy
 var _jump_at := -10000
 
 
+var _last_body_yaw := 0.0
+
 func parachute_active() -> bool:
 	return parachute_state > 0
 
@@ -665,9 +667,13 @@ func _update_body(delta: float) -> void:
 		mode = "freefall"
 	elif parachute_state == 2:
 		mode = "chute"
+	var _yaw_now := global_rotation.y
+	var _turn := wrapf(_yaw_now - _last_body_yaw, -PI, PI) / maxf(get_physics_process_delta_time(), 0.001)
+	_last_body_yaw = _yaw_now
 	if mode != body.mode:
 		body.set_mode(mode)
 	body.update(delta, {
+		"turn_rate": _turn,
 		"speed": Vector2(velocity.x, velocity.z).length(),
 		"on_floor": is_on_floor() or parachute_state > 0,
 		"crouch": crouching or sliding,

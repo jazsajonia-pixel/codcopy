@@ -39,6 +39,9 @@ func _ready() -> void:
 	cam.fov = 50
 	add_child(cam)
 	cam.look_at(Vector3(0, 0.9, 0))
+	if state == "chute":
+		cam.position = Vector3(5.0, 3.2, 9.5)
+		cam.look_at(Vector3(0, 2.6, 0))
 
 func _process(delta: float) -> void:
 	t += delta
