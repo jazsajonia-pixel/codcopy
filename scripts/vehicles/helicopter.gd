@@ -10,9 +10,13 @@ extends Vehicle
 ## Seats: 0 = pilot, 1..3 passengers. Reuses Vehicle's seats / enter / exit / damage / explosion.
 
 const LIFT_MARGIN := 0.65      ## extra lift (fraction of weight) at full collective
-const MAX_TILT := 0.42         ## rad, cyclic limit (~24 deg)
+const MAX_TILT := 0.5         ## rad, cyclic limit (~24 deg)
 const SPOOL_TIME := 2.5        ## seconds to full rotor RPM
 const MAX_ALT := 220.0
+const CLIMB_RATE := 9.0        ## m/s at full UP
+const SINK_RATE := 7.0         ## m/s at full DOWN
+const CYCLIC_ASSIST := 4.5     ## m/s^2 extra horizontal push along the stick (arcade feel)
+const DRAG_K := 9.0
 
 var collective := 0.0          ## -1 down .. +1 up
 var cyclic := Vector2.ZERO     ## x roll (right +), y pitch (forward -)
@@ -23,6 +27,7 @@ var tail_rotor: Node3D
 var _prev_vel := Vector3.ZERO
 var _wash_t := 0.0
 var _hp_mat: StandardMaterial3D
+var autopilot_test := false    ## tests: fly without an Actor in the pilot seat
 
 
 func setup(_kind: String) -> void:
@@ -41,7 +46,7 @@ func _ready() -> void:
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = Vector3(0, 0.6, 0)
 	linear_damp = 0.05
-	angular_damp = 2.5
+	angular_damp = 0.4
 	contact_monitor = true
 	max_contacts_reported = 4
 	cam_dist = 13.0
@@ -234,7 +239,9 @@ func _physics_process(delta: float) -> void:
 		_hit_cooldown[k] -= delta
 		if _hit_cooldown[k] <= 0.0:
 			_hit_cooldown.erase(k)
-	var drv := driver()
+	var drv: Object = driver()
+	if drv == null and autopilot_test:
+		drv = self
 	if not alive:
 		rpm = move_toward(rpm, 0.0, delta * 0.4)
 		_spin(delta)
@@ -247,17 +254,22 @@ func _physics_process(delta: float) -> void:
 	var up := b.y
 	var g := 9.8
 	var weight := mass * g
-	# Lift: hover thrust compensates for tilt so pushing the stick doesn't drop altitude much.
+	# Lift: hover thrust compensates for tilt; collective sets a target climb rate (arcade-friendly
+	# vertical speed controller), and the ground cushion slows the last few metres of a descent.
 	var tilt_comp := 1.0 / maxf(up.y, 0.6)
-	var lift := weight * tilt_comp * (1.0 + collective * LIFT_MARGIN) * rpm * rpm
-	# Hover assist: hands-off collective damps vertical speed (holds altitude).
-	if drv != null and absf(collective) < 0.1 and rpm > 0.9:
-		lift += -linear_velocity.y * mass * 2.0
-	if global_position.y > MAX_ALT:
-		lift *= 0.6
+	var lift := weight * tilt_comp * rpm * rpm
+	if drv != null and rpm > 0.5:
+		var alt := altitude()
+		var target_vy := collective * (CLIMB_RATE if collective > 0.0 else SINK_RATE)
+		if collective < 0.0 and alt < 10.0:
+			target_vy = lerpf(-1.6, target_vy, clampf((alt - 1.5) / 8.5, 0.0, 1.0))
+		lift += (target_vy - linear_velocity.y) * mass * 2.5 * rpm
+		lift = clampf(lift, 0.0, weight * 1.9)
+	elif drv == null:
+		lift *= 0.75   # spinning down: autorotation slows the fall a little
 	apply_central_force(up * lift)
 	# Attitude PD controller: cyclic -> target pitch / roll, measured in the yaw frame.
-	var yaw := atan2(-b.z.x, -b.z.z)
+	var yaw := atan2(b.z.x, b.z.z)
 	# Angles are measured as "nose down" (pitch) and "right wing up" (roll), both in radians.
 	var target_pitch := -cyclic.y * MAX_TILT          # forward stick (y<0) = nose down
 	var target_roll := -cyclic.x * MAX_TILT * 0.8     # right stick = right wing down
@@ -267,16 +279,21 @@ func _physics_process(delta: float) -> void:
 	var cur_roll := asin(clampf(b.x.y, -1.0, 1.0))
 	var av := angular_velocity
 	var k_p := mass * 6.0 * maxf(rpm, 0.2)
-	var k_d := mass * 2.2
+	var k_d := mass * 4.5
 	var pitch_t := -(target_pitch - cur_pitch) * k_p - av.dot(right_flat) * k_d
 	var roll_t := -(target_roll - cur_roll) * k_p - av.dot(fwd_flat) * k_d
 	apply_torque(right_flat * pitch_t + fwd_flat * roll_t)
 	# Yaw toward the pilot's heading (tail rotor), plus a little auto-coordination into turns.
 	var yaw_err := wrapf(heading_target - yaw, -PI, PI) if drv != null else 0.0
-	apply_torque(Vector3.UP * (yaw_err * mass * 3.0 * rpm - av.y * mass * 1.8))
+	apply_torque(Vector3.UP * (yaw_err * mass * 8.0 * rpm - av.y * mass * 5.0))
 	# Aerodynamic drag (quadratic) and a weathervane push along the nose.
 	var v := linear_velocity
-	apply_central_force(-v * v.length() * 2.2)
+	apply_central_force(-v * v.length() * DRAG_K)
+	if drv != null and rpm > 0.8:
+		apply_central_force((fwd_flat * -cyclic.y + right_flat * cyclic.x) * mass * CYCLIC_ASSIST)
+		if cyclic.length() < 0.15:
+			# Stick released: hover-hold assist bleeds off horizontal speed.
+			apply_central_force(-Vector3(v.x, 0, v.z) * mass * 0.7)
 	# Crash damage: hard velocity changes = impacts.
 	var dv := (v - _prev_vel).length()
 	if dv > 9.0 and get_contact_count() > 0:
@@ -322,7 +339,7 @@ func _rotor_wash(delta: float) -> void:
 	_wash_t = 0.25
 	var alt := altitude()
 	if alt < 22.0:
-		Effects.burst("land", global_position - Vector3.UP * alt + Vector3.UP * 0.1, Vector3.UP, 2.6 - alt * 0.08)
+		Effects.burst("land", global_position - Vector3.UP * alt + Vector3.UP * 0.1, Vector3.UP, clampf(1.6 - alt * 0.06, 0.4, 1.6))
 
 
 func _explode() -> void:
