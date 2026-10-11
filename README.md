@@ -43,7 +43,7 @@ pressing a keyboard key or gamepad button switches to keyboard/mouse (click the 
 aiming).
 
 **If you can't move / there are no on-screen controls:**
-1. Check the build shown on the main menu's HOME page (e.g. `Build 0.5.1 (2026-10-11)`). If it is older or missing,
+1. Check the build shown on the main menu's HOME page (e.g. `Build 0.6.0 (2026-10-11)`). If it is older or missing,
    your copy is out of date. In the **Godot Android editor**: download the repo again (GitHub > Code > Download ZIP),
    extract it, import/open that folder in the Project Manager, let it finish importing, then press Play.
 2. If something fails at runtime, a red **ERRORS** box appears in the top-left with the message and script line
@@ -54,8 +54,13 @@ aiming).
 ### Touch (default on touchscreen devices)
 - **Left side**: floating movement joystick. Push fully forward to auto-sprint; drag past the top to lock sprint.
 - **Right side**: drag anywhere empty to look. Dragging on **FIRE** or **ADS** also aims (fire-and-steer).
-- Buttons: FIRE (right, plus optional left FIRE), ADS, JUMP, CROUCH (tap while sprinting to slide), RELOAD, SWAP,
-  FRAG (lethal), TACT (tactical), KNIFE (melee), PICK/OPEN (appears near loot), SPRINT, HEAL / PLATE (BR only), TAB (scoreboard), II (pause).
+- Buttons: FIRE (right, plus optional left FIRE), ADS, JUMP, CROUCH (tap while sprinting to slide), RELOAD,
+  FRAG (lethal), TACT (tactical), PICK/OPEN (appears near loot), SPRINT, HEAL / PLATE / BAG / VIEW (BR only), TAB (scoreboard), II (pause).
+- **Weapon bar** (bottom centre, CODM style): in Battle Royale it shows weapon 1, weapon 2 and fists/knife - tap a card
+  to equip it. In Multiplayer it shows the gun in your hands (tap to swap to the other one) and the knife (tap = quick
+  melee). The old SWAP and KNIFE buttons are hidden by default and can be turned back on in the HUD editor.
+- While aiming down sights every button except FIRE and ADS fades out (and the weapon bar dims), so the sight is clear.
+- During the BR drop JUMP becomes **CHUTE** (open the parachute) and **CUT** (close it again while high enough).
 - The interact button changes with context: PICK / OPEN near loot, DRIVE / RIDE near a vehicle, REVIVE (hold) near a downed teammate.
 - **Driving**: the joystick steers and accelerates, drag the right side to orbit the chase camera, BRAKE = handbrake,
   EXIT gets out. Weapon buttons are hidden while driving.
@@ -69,7 +74,9 @@ aiming).
 | Move | WASD / arrows | Fire / ADS | LMB / RMB |
 | Jump | Space | Crouch / slide | C or Ctrl |
 | Sprint | Shift | Reload | R |
-| Switch weapon | Q / 1 / 2 | Frag / tactical | G / T |
+| Swap weapon | Q | Weapon slot 1 / 2 / fists (BR) or knife (MP) | 1 / 2 / 3 |
+| Frag / tactical | G / T | First / third person (BR) | Z |
+| Backpack (BR) | I or B | Open / close parachute | Space (while dropping) |
 | Melee | V | Interact / loot | F or E |
 | Heal / armor plate | H / X | Full map | M |
 | Scoreboard | Tab (hold) | Pause | Esc / P |
@@ -102,6 +109,12 @@ Click the game window to capture the mouse.
   magazine, reserve, reload (tactical/empty), ADS time and FOV, hip/ADS/move spread, bloom, recoil and recovery, mobility.
 - Hitscan with spread cone, damage falloff, headshots, wall penetration blocked, tracers, impacts, muzzle flash,
   hit markers (headshot/kill variants), damage direction indicators, kill feed, kill streak callouts.
+- **Floating damage numbers** over the target (white = health, blue = armor, yellow = headshot; rapid hits add up).
+  Can be turned off in Settings > Controls.
+- **Accurate crosshair**: the crosshair gap is the exact bullet cone (spread + bloom + movement, slide, jump and
+  crouch modifiers), so shots always land inside it. Optics show their own reticle while aiming.
+- **Slide vs crouch** (CODM rule): crouch while you have been sprinting for a moment = slide; crouch while walking,
+  standing, or just after getting up = crouch.
 - 15 attachments with real stat modifiers; suppressors hide you from the enemy radar.
 - Frag, sticky charge, smoke (blocks bot vision), flash (blinds player and bots); melee knife/hatchet/baton.
 - First-person view model with bob, sway, recoil kick, reload and switch animations, optic models, skin tint.
@@ -142,9 +155,21 @@ Click the game window to capture the mouse.
 
 ### Battle Royale (offline vs bots)
 - **Isla Verde**: 400 m island with terrain, water and six POIs (Harbor Town, Depot, Farmstead, Radar Hill, Crossing, Pine Ridge).
-- Boarding countdown, aircraft flight path, jump, free-fall, parachute (auto-deploys at low altitude or press JUMP).
+- **Third-person view** (default in BR, like CODM's BR TPP; Multiplayer is always first person). Over-the-shoulder
+  camera that pulls in when a wall is behind you; aiming down sights switches to the first-person sight; the VIEW
+  button / Z key (or Settings > Controls > Battle Royale view) switches between first and third person.
+- **Drop**: boarding countdown, then a higher (240 m) and slower aircraft. After jumping you fly a **wingsuit**: push
+  forward to glide (about 27 m/s forward, 15 m/s down), look down to dive (up to 42 m/s down). The **parachute** opens
+  by itself at 45 m or earlier with CHUTE/Space, can be closed again with CUT/Space above 28 m, and you can fire from
+  the hip under the canopy. The camera pulls back while dropping, and the HUD shows altitude and speed. Bots use the
+  same wingsuit and parachute.
 - Ground loot (weapons + matching ammo, armor tiers 1-3, medkits, bandages, armor plates, grenades), supply crates at POIs, death boxes.
-- 2-weapon inventory with swapping, shared ammo pools, health + armor, timed healing/plating.
+- 2-weapon inventory plus fists, shared ammo pools, health + armor, timed healing/plating.
+- **Auto loot** (on by default, Settings > Controls): walking over a weapon puts it in an empty slot without taking
+  the gun out of your hands, and better armor is put on automatically. Ammo, heals, plates and grenades are always
+  auto-collected. Items you drop are not picked straight back up.
+- **Backpack** (BAG button / I key): your weapons with their attachments (EQUIP / DROP), armor (DROP), ammo per type
+  (DROP), med kits, bandages and plates (USE / DROP) and grenades (DROP). The match keeps running while it is open.
 - 5-phase shrinking safe zone with escalating damage, next-circle preview on minimap and full map (M).
 - Alive counter, kill feed, placement, victory when last alive (or last squad standing).
 - **Squads**: Solo, Duo or Squad (4). Your teammates are AI bots labelled `[BOT]`. In duos/squads a lethal hit knocks
@@ -208,6 +233,9 @@ godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- vehicle # vehicl
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- squad   # BR squads: knock-down, revive, wipe, spectate
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- br_squad # full autoplayed squad BR match
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- dom     # Domination + UAV
+godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- moves   # slide vs crouch rules, crosshair = bullet cone
+godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- brfeat  # TPP camera, weapon bar, auto loot, backpack, wingsuit/parachute, damage numbers
+godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- keys    # real keyboard/mouse events (also run under xvfb)
 tests/run_net_test.sh                                                  # LAN TDM: host + client processes on localhost
 ```
 Run them one at a time (they share the `user://test_tmp` folder). Exit code 0 means pass. The LAN test runs in real
@@ -240,8 +268,11 @@ bot count and BR lobby size for lower-end phones.
 - LAN has no lag compensation or anti-cheat; the host's validation only rejects implausible hit reports.
 - Not tested on physical Android/iOS hardware; touch input was verified with synthetic events only.
 - Low-poly CC0 art; arms have no hand-animated clips (poses are procedural IK), simple aircraft/parachute meshes.
-- Character models have no per-weapon animations; third-person weapon holding is approximate. Downed bots are shown
-  by tilting their model (no crawl animation).
+- Operator bodies use the character kit's own clips (idle, walk, sprint, crouch, fall, die, holding/shooting poses)
+  blended in an AnimationTree, plus a procedural aim-pitch pose. There are no reload or weapon-specific third-person
+  animations, and downed operators are shown by tilting the model (no crawl animation). The wingsuit is simple
+  box-shaped membranes.
+- Weapon icons on the weapon bar / backpack are rendered from the 3D gun models at runtime (no hand-drawn icons).
 - Bots never drive vehicles; there are no boats or helicopters. Vehicle handling is arcade-simple.
 - One scorestreak (UAV) only; no ranked mode, no Hardpoint/Search & Destroy.
 - Bot tactics are basic (simple cover selection, no squad tactics beyond follow / revive). Bots can occasionally get stuck on geometry.
@@ -251,5 +282,6 @@ bot count and BR lobby size for lower-end phones.
 
 1. Build and profile on real Android devices (low/medium/high presets), then tune draw distance and bot counts.
 2. Test LAN play between real devices on Wi-Fi; add lag compensation and network Domination/FFA.
-3. Hand-authored arm animations and weapon-specific third-person poses; crawl animation for downed operators.
+3. Hand-authored arm animations and weapon-specific third-person poses (reload in TPP); crawl animation for downed operators.
 4. Bots that drive, more maps and modes (Hardpoint), more scorestreaks.
+5. Squad ping markers, attachment swapping inside the backpack, BR classes / airdrops.

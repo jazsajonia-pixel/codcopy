@@ -20,9 +20,20 @@ diff and test.
   weapon firing, reload, grenades, melee, damage/death, spawn protection, flash blindness, stats.
 - `Combat` — hitscan rays with spread, headshot detection (head hitbox), falloff, explosions with line-of-sight, melee.
 - `WeaponData` (Resource) + `WeaponInstance` (runtime ammo/heat/bloom, attachments applied as multipliers).
-- `Inventory` — two weapon slots + melee + lethal/tactical, BR ammo pools, meds/plates.
+- `Inventory` — two weapon slots + `holstered` (fists/knife out, `active()` returns null) + melee + lethal/tactical,
+  BR ammo pools, meds/plates. `pick_up_weapon(w, equip)` can fill an empty slot without switching (auto loot).
+- `ActorModel` (`scripts/combat/actor_model.gd`) — the third-person body used by bots **and** the player: Kenney
+  character under a `pose_root` pivot, an `AnimationTree` (locomotion `Transition` → `TimeScale` → `Blend2` filtered to
+  the arm bones with holding/shooting poses), `AimPose` (`SkeletonModifier3D`, tilts arms/head by aim pitch), gun in the
+  hands, wingsuit and parachute meshes. `set_mode(ground|freefall|chute|downed|dead)` + `update(delta, state)`.
+  For the player in first person it renders shadow-only.
 - `Player` — reads a `PlayerInput` state filled by keyboard/mouse, gamepad, or `TouchControls`; camera, ADS FOV,
   recoil, aim assist (touch only, slowdown + light magnetism), gyro, sprint/slide/crouch, `ViewModel` for first person.
+  `_update_camera` blends the camera between first person and an over-shoulder offset on the head pivot (BR setting,
+  first person while aiming, ray-cast pull-in, far offset while dropping). In third person the shot origin is moved
+  forward along the camera ray to the player's head so objects behind the player can't block shots.
+  `_parachute_move` handles the wingsuit (glide/dive by pitch) and the parachute (auto at `CHUTE_AUTO_AGL`, toggle
+  with JUMP above `CHUTE_MIN_CUT_AGL`); bots reuse the same constants.
 - `FPArms` (`scripts/player/fp_arms.gd`) — rigged CC0 arms posed every frame with two-bone IK; `ViewModel` picks hand
   targets from named gun bones (trigger, rail, pump, magazine, bolt, slide) and drives reload/cycle/throw/heal poses.
 - Squad knock-down lives in `Actor`: `can_be_downed` + `down_check`, `_knock()`, bleed-out in `tick_common`,
@@ -49,9 +60,16 @@ diff and test.
 ## UI
 
 - `main_menu.gd` + `pages/*` — each page is its own script; `UITheme` builds the shared theme.
-- `hud.gd` (labels, bars, kill feed, scoreboard, pause), `hud_overlay.gd` (custom-drawn crosshair, hit markers, damage
-  indicators, scope), `minimap.gd`, `touch_controls.gd` (per-finger ownership, floating joystick, editable layout),
+- `hud.gd` (labels, bars, kill feed, scoreboard, pause, drop readout), `hud_overlay.gd` (custom-drawn crosshair,
+  hit markers, damage indicators, floating damage numbers from `Actor.damage_dealt`, scope), `minimap.gd`,
+  `touch_controls.gd` (per-finger ownership, floating joystick, editable layout, fades all but FIRE/ADS while aiming),
   `hud_editor.gd`.
+- `WeaponBar` (`scripts/ui/weapon_bar.gd`) — custom-drawn CODM-style weapon cards; `TouchControls` forwards taps to
+  `tap()` before the joystick/look areas. `WeaponIcons` renders each gun model once in an off-screen `SubViewport`
+  and caches a white silhouette `ImageTexture` (null on headless).
+- `BagPanel` (`scripts/ui/bag_panel.gd`) — BR backpack built from regular `Button`s; while open the touch layer is
+  hidden and `Player.allow_input` is off so taps reach the GUI. Drops use `LootItem.drop_from()` (marks the dropper so
+  auto loot ignores the item for 6 s).
 - `loading_screen.gd` draws the screen for two frames, then loads the match scene synchronously (threaded loading
   failed to resolve `hud.gd` on real runs, leaving matches without a HUD).
 

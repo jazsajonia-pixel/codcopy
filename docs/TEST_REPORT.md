@@ -5,7 +5,37 @@ container on 10 Oct 2026. Match suites use `--fixed-fps 60` (simulated time, not
 real time. Godot 4.7.3 does not exist yet, so nothing was tested on it. Screenshots were rendered under Xvfb with
 `--rendering-driver opengl3` (Compatibility), **not** the Mobile Vulkan renderer the project is configured for.
 
-## Tests that were run (latest round)
+## Round 0.6.0 (11 Oct 2026): TPP, weapon bar, drop, auto loot, backpack
+
+Same environment (Godot 4.7.2, headless unless noted). Every suite was run one at a time after the last code change
+of this round:
+
+| Suite | Result |
+|---|---|
+| Script/scene check | 101 resources, 0 failures |
+| `unit` / `menus` / `touch` / `flow` | 42/0, 19/0, 9/0, 18/0 |
+| `keys` headless / under Xvfb (real window, 1280x720) | 22/0 / 28/0 (BR part: Space leaves the aircraft, dive, land) |
+| `phone` under Xvfb at 2400x1080 | 8/0 |
+| `moves` (slide vs crouch, crosshair = bullet cone) | 17/0 |
+| **`brfeat` (new)**: BR starts in third person; TPP shows the body and hides the arms; ADS switches to the first-person sight; camera pulls in against a wall; VIEW toggles FPP/TPP; MP always FPP and ignores VIEW; auto loot puts a weapon in the empty slot without switching; a weapon dropped from the backpack is not re-looted at once; auto loot off needs Interact; better armor auto-worn, worse left; slot 3 = fists and FIRE punches; slot 2 equips; SWAP from fists draws a gun; BR weapon bar has 3 cards and taps select slots; MP bar shows only gun + knife and tapping swaps; backpack lists items and drops ammo / med kit; wingsuit glide speed, far drop camera, dive speed, JUMP opens the chute, slow chute descent, hip fire under the chute, JUMP closes it, auto-open at <= 45 m, landing; damage numbers stack, fade and obey the setting | **38/0** |
+| `tdm` / `ffa` / `vehicle` / `dom` / `squad` | 5/0, 5/0, 20/0, 10/0, 19/0 |
+| `br` | 8/0 on 3 consecutive runs after the fix below (2 of 3 earlier runs failed) |
+| `br_squad` | 8/0 |
+| LAN (`tests/run_net_test.sh`) | host 13/0, client 13/0 |
+
+Bug found this round: with the longer drop the test autopilot landed after the bots, then chased enemies while
+unarmed instead of looting, so `br` failed intermittently. The autopilot now dives and only fights unarmed at fist
+range. Visual checks (Xvfb, opengl3, 1280x720, `tests/screenshot.gd -- drop`): wingsuit glide, dive, parachute,
+landing in third person, teammates walking/sprinting with guns, touch HUD with the weapon bar, ADS fade, sniper
+scope, first person, and the backpack. Fixed from these: the body's gun was too small to see, wings were hard to
+see, the character covered the crosshair (camera moved further over the shoulder), and the drop readout overlapped
+the health bar. The aim-pitch pose was checked from the side (arms and gun tilt up/down the right way).
+
+Not verified this round: the Godot **Android editor** and real phones (the 0.6.0 build was never run on a device),
+TPP camera feel on a small screen, and weapon-icon rendering on the Mobile/Vulkan renderer (icons were only seen
+with opengl3; headless shows text-only cards).
+
+## Tests that were run (previous round)
 
 | Suite | What it checks | Result |
 |---|---|---|
