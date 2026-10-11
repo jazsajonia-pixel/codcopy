@@ -141,6 +141,9 @@ func _controls_tab() -> void:
 	_check(v, "controls", "invert_y", "Invert vertical look")
 	_check(v, "controls", "aim_assist", "Aim assist", "Slows the crosshair over enemies and gently pulls ADS toward targets in view. Applies to touch controls only.")
 	_check(v, "controls", "auto_fire", "Simple mode (auto-fire)", "Fires automatically while the crosshair is on an enemy in range.")
+	_choice(v, "controls", "br_view", "Battle Royale view", [["tpp", "Third person"], ["fpp", "First person"]], "Multiplayer is always first person. Aiming down sights in third person switches to the first-person sight. Also the VIEW button / Z key in a match.")
+	_check(v, "controls", "auto_loot", "Auto loot (Battle Royale)", "Walk over weapons to put them in an empty slot (keeps the gun in your hands) and wear better armor automatically. Ammo, heals, plates and grenades are always auto-collected.")
+	_check(v, "controls", "damage_numbers", "Damage numbers", "Show the damage of each hit floating over the target.")
 	if OS.has_feature("mobile"):
 		_check(v, "controls", "gyro_enabled", "Gyroscope aiming", "Uses the device gyroscope (if present) to aim while using touch controls.")
 	v.add_child(UITheme.button("Customize HUD layout", func(): get_tree().change_scene_to_file("res://scenes/menus/hud_editor.tscn"), Vector2(320, 56)))

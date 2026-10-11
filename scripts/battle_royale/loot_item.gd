@@ -1,13 +1,18 @@
 class_name LootItem
 extends Node3D
 ## Ground loot for Battle Royale: weapons, ammo, armor, heals, plates and grenades.
-## Ammo/heals/plates/grenades are auto-collected when useful; weapons and armor need Interact.
+## Ammo/heals/plates/grenades are auto-collected when useful. With the Auto Loot setting on (default)
+## weapons also go straight into an empty slot (without switching away from the gun in hand) and
+## better armor is put on automatically; otherwise weapons and armor need Interact.
 
 var kind := "ammo"     ## weapon | ammo | armor | heal | plate | grenade
 var item_id := ""      ## weapon id or GameDB.BR_ITEMS id
 var amount := 1
 var tier := 0
 var weapon_attachments := {}
+var dropper: WeakRef = null   ## who dropped it from their bag (not auto-picked back up by them for a while)
+var drop_msec := 0
+const REPICK_DELAY_MS := 6000
 var _visual: Node3D
 var _t := 0.0
 
@@ -80,10 +85,36 @@ func prompt() -> String:
 	return "Pick up %s" % display_name()
 
 
-## Auto-collect cheap items. Returns true if consumed (caller should skip it as an interact target).
+## Drop an item from a bag in front of the actor.
+static func drop_from(a: Actor, p_kind: String, p_id: String, p_amount: int = 1, attachments: Dictionary = {}) -> LootItem:
+	var l := LootItem.make(p_kind, p_id, p_amount)
+	l.weapon_attachments = attachments
+	l.dropper = weakref(a)
+	l.drop_msec = Time.get_ticks_msec()
+	a.get_parent().add_child(l)
+	var fwd := -a.global_transform.basis.z
+	fwd.y = 0
+	l.global_position = a.global_position + fwd.normalized() * 1.3 + Vector3(randf_range(-0.4, 0.4), 0.0, randf_range(-0.4, 0.4))
+	return l
+
+
+static func auto_loot_enabled() -> bool:
+	return bool(SaveManager.get_setting("controls", "auto_loot", true))
+
+
+## Auto-collect. Returns true if consumed (caller should skip it as an interact target).
 func auto_pickup(a: Actor) -> bool:
-	if not is_inside_tree() or kind in ["weapon", "armor"]:
+	if not is_inside_tree():
 		return false
+	if dropper and dropper.get_ref() == a and Time.get_ticks_msec() - drop_msec < REPICK_DELAY_MS:
+		return false
+	if kind == "weapon":
+		if not auto_loot_enabled() or (a.inv.weapons[0] != null and a.inv.weapons[1] != null):
+			return false
+		return _apply(a, false)
+	if kind == "armor":
+		if not auto_loot_enabled() or tier <= a.armor_tier:
+			return false
 	return _apply(a)
 
 
@@ -93,18 +124,20 @@ func interact(a: Actor) -> void:
 	_apply(a)
 
 
-func _apply(a: Actor) -> bool:
+func _apply(a: Actor, equip: bool = true) -> bool:
 	var inv := a.inv
 	var it: Dictionary = GameDB.BR_ITEMS.get(item_id, {})
 	var ok := false
 	match kind:
 		"weapon":
 			var w := WeaponInstance.create(item_id, weapon_attachments, "default", false)
-			var dropped := inv.pick_up_weapon(w)
+			var dropped := inv.pick_up_weapon(w, equip)
 			inv.add_ammo(w.data.ammo_type, w.mag_size())
 			if dropped:
 				var l := LootItem.make("weapon", dropped.id())
 				l.weapon_attachments = dropped.attachments
+				l.dropper = weakref(a)
+				l.drop_msec = Time.get_ticks_msec()
 				get_parent().add_child(l)
 				l.global_position = global_position + Vector3(randf_range(-0.6, 0.6), 0, randf_range(-0.6, 0.6))
 			if a is Player:

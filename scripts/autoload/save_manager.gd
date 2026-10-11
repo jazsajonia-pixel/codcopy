@@ -35,6 +35,9 @@ const DEFAULT_SETTINGS := {
 		"sprint_mode": "auto",      # auto (push joystick fully forward) | toggle
 		"ads_mode": "toggle",       # toggle | hold
 		"auto_fire": false,          # fire automatically when crosshair is on an enemy
+		"br_view": "tpp",            # Battle Royale camera: tpp | fpp (Multiplayer is always first person)
+		"auto_loot": true,           # BR: weapons into empty slots + better armor picked up automatically
+		"damage_numbers": true,      # floating damage numbers on hits
 	},
 	"audio": {
 		"master": 0.9,
