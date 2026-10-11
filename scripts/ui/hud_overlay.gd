@@ -78,31 +78,17 @@ func _draw() -> void:
 			draw_rect(Rect2(sz.x - w, 0, w, sz.y), Color(0.6, 0, 0, a / 6.0))
 	_draw_damage_numbers()
 	var w := player.inv.active()
-	var scoped := w != null and bool(w.stats.scope_overlay) and player.ads_blend > 0.85
-	player.scope_hide = scoped
+	var optic_kind: String = str(w.stats.optic) if w != null else ""
+	var magnified := w != null and (bool(w.stats.scope_overlay) or optic_kind in ["3x", "4x", "8x"])
+	# Scope-in: the screen darkens as the eye reaches the eyepiece, then the lens opens. The 3D
+	# scope model is hidden once the overlay is up so it can never block the view.
+	var scope_k := clampf((player.ads_blend - 0.55) / 0.3, 0.0, 1.0) if magnified and player.alive else 0.0
+	var scoped := scope_k >= 1.0
+	player.scope_hide = scope_k > 0.6
+	if scope_k > 0.0 and not scoped:
+		draw_rect(Rect2(Vector2.ZERO, sz), Color(0, 0, 0, sin(scope_k * PI) * 0.85))
 	if scoped:
-		var r := minf(sz.x, sz.y) * 0.46
-		# Black outside the scope circle
-		draw_rect(Rect2(0, 0, c.x - r, sz.y), Color.BLACK)
-		draw_rect(Rect2(c.x + r, 0, sz.x - c.x - r, sz.y), Color.BLACK)
-		var pts := PackedVector2Array()
-		for i in 65:
-			var ang := PI + PI * i / 64.0
-			pts.append(c + Vector2(cos(ang), sin(ang)) * r)
-		pts.append(Vector2(c.x + r, 0))
-		pts.append(Vector2(c.x - r, 0))
-		draw_colored_polygon(pts, Color.BLACK)
-		var pts2 := PackedVector2Array()
-		for i in 65:
-			var ang2 := PI * i / 64.0
-			pts2.append(c + Vector2(cos(ang2), sin(ang2)) * r)
-		pts2.append(Vector2(c.x - r, sz.y))
-		pts2.append(Vector2(c.x + r, sz.y))
-		draw_colored_polygon(pts2, Color.BLACK)
-		draw_arc(c, r, 0, TAU, 96, Color(0, 0, 0), 6.0)
-		draw_line(c - Vector2(r, 0), c + Vector2(r, 0), Color(0, 0, 0, 0.9), 1.5)
-		draw_line(c - Vector2(0, r), c + Vector2(0, r), Color(0, 0, 0, 0.9), 1.5)
-		draw_circle(c, 2.0, Color(1, 0.1, 0.1))
+		_draw_scope(c, sz, optic_kind if optic_kind in ["3x", "4x"] else "8x", w)
 	elif player.alive and w and player.parachute_state != 1 and not player.downed:
 		# Exact cone of the next shot projected to pixels (vertical FOV), smoothed slightly so it
 		# animates; it expands with every shot (bloom) and recovers as the weapon settles.
@@ -137,10 +123,6 @@ func _draw() -> void:
 				draw_circle(c, 1.6, Color(0.3, 1, 0.45, al))
 				for d in [Vector2(0, -1), Vector2(-1, 0), Vector2(1, 0)]:
 					draw_line(c + d * 14, c + d * 19, Color(0.3, 1, 0.45, 0.9 * al), 1.6)
-			elif optic in ["4x", "8x"]:
-				draw_line(c - Vector2(30, 0), c + Vector2(30, 0), Color(0, 0, 0, al), 1.5)
-				draw_line(c, c + Vector2(0, 30), Color(0, 0, 0, al), 1.5)
-				draw_circle(c, 2.0, Color(1, 0.2, 0.1, al))
 	# Hit marker
 	if hit_t > 0.0:
 		var s := float(SaveManager.get_setting("accessibility", "hitmarker_scale", 1.0))
@@ -160,6 +142,70 @@ func _draw() -> void:
 	# Flash
 	if player.flash_time > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, sz), Color(1, 1, 1, clampf(player.flash_time / 1.2, 0, 0.95)))
+
+
+## Magnified optic picture. The world is rendered through a clear lens (the camera FOV does the
+## zoom); everything outside is the scope housing. 3x/4x use a wide eyepiece with a soft edge
+## and an ACOG-style chevron, 8x/sniper scopes get the classic black ring with a mil-dot cross.
+func _draw_scope(c: Vector2, sz: Vector2, kind: String, w) -> void:
+	var big := kind == "8x"
+	var r := minf(sz.x, sz.y) * (0.47 if big else 0.5)
+	# Lens bob: the eyepiece trails the camera a few pixels when moving/turning.
+	c += player.scope_bob
+	var housing := Color(0.02, 0.02, 0.02, 1.0 if big else 0.96)
+	_ring_fill(c, r, sz, housing)
+	# Soft inner vignette (glass edge darkening) and a faint lens tint.
+	for i in 10:
+		var k := float(i) / 10.0
+		draw_arc(c, r - k * r * 0.16, 0, TAU, 96, Color(0, 0, 0, 0.16 * (1.0 - k)), r * 0.018 + 2.0, true)
+	draw_circle(c, r, Color(0.35, 0.55, 0.65, 0.05))
+	draw_arc(c, r, 0, TAU, 128, Color(0.12, 0.12, 0.12), 7.0, true)
+	draw_arc(c, r - 4.0, 0, TAU, 128, Color(0.4, 0.42, 0.45, 0.35), 1.5, true)
+	var ink := Color(0.03, 0.03, 0.03, 0.95)
+	if big:
+		# Thick outer posts + thin center cross + mil dots.
+		var gap := r * 0.12
+		for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1)]:
+			draw_line(c + d * r * 0.55, c + d * r, ink, 7.0)
+		draw_line(c + Vector2(0, -1) * r * 0.55, c + Vector2(0, -1) * r, ink, 3.0)
+		draw_line(c - Vector2(r * 0.55, 0), c + Vector2(r * 0.55, 0), ink, 1.4)
+		draw_line(c - Vector2(0, r * 0.55), c + Vector2(0, r * 0.55), ink, 1.4)
+		for i in range(1, 5):
+			var o := gap * i
+			for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+				draw_circle(c + d * o, 2.4, ink)
+		draw_circle(c, 2.2, Color(1, 0.12, 0.08))
+	else:
+		# ACOG chevron + bullet-drop ticks, red illuminated tip.
+		var s := r * 0.05
+		draw_line(c + Vector2(-s, s * 1.3), c, ink, 2.4)
+		draw_line(c + Vector2(s, s * 1.3), c, ink, 2.4)
+		draw_line(c + Vector2(-s * 0.8, s * 1.1), c + Vector2(0, -1), Color(1, 0.2, 0.1, 0.95), 1.6)
+		draw_line(c + Vector2(s * 0.8, s * 1.1), c + Vector2(0, -1), Color(1, 0.2, 0.1, 0.95), 1.6)
+		draw_line(c + Vector2(0, s * 1.4), c + Vector2(0, r * 0.5), ink, 1.4)
+		for i in range(1, 5):
+			var y := c.y + s * 1.4 + r * 0.09 * i
+			var hw := r * (0.05 - i * 0.008)
+			draw_line(Vector2(c.x - hw, y), Vector2(c.x + hw, y), ink, 1.4)
+		draw_line(c + Vector2(-r, 0), c + Vector2(-r * 0.62, 0), ink, 2.0)
+		draw_line(c + Vector2(r * 0.62, 0), c + Vector2(r, 0), ink, 2.0)
+
+
+## Fills everything outside a circle of radius r (centered at c) with col.
+func _ring_fill(c: Vector2, r: float, sz: Vector2, col: Color) -> void:
+	draw_rect(Rect2(0, 0, maxf(c.x - r, 0), sz.y), col)
+	draw_rect(Rect2(c.x + r, 0, maxf(sz.x - c.x - r, 0), sz.y), col)
+	draw_rect(Rect2(c.x - r, 0, r * 2, maxf(c.y - r, 0)), col)
+	draw_rect(Rect2(c.x - r, c.y + r, r * 2, maxf(sz.y - c.y - r, 0)), col)
+	# Four corner pieces between the square and the circle, as triangle fans (always convex).
+	var n := 24
+	for q in 4:
+		var a0 := q * PI * 0.5
+		var corner := c + Vector2(signf(cos(a0 + PI * 0.25)), signf(sin(a0 + PI * 0.25))) * r
+		for i in n:
+			var a := a0 + PI * 0.5 * i / n
+			var b := a0 + PI * 0.5 * (i + 1) / n
+			draw_colored_polygon(PackedVector2Array([corner, c + Vector2(cos(a), sin(a)) * r, c + Vector2(cos(b), sin(b)) * r]), col)
 
 
 func _draw_damage_numbers() -> void:

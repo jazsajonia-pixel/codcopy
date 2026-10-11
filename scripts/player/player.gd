@@ -68,6 +68,9 @@ var agl := 0.0                    ## height above ground while dropping
 var body: ActorModel              ## own animated body: third-person view, first-person shadow
 var cam_tpp := 0.0                ## 0 = first person, 1 = third person camera
 var scope_hide := false           ## set by the HUD while a full-screen scope covers the view
+var scope_bob := Vector2.ZERO     ## pixels the scope eyepiece trails the view (HUD overlay)
+var _sway_t := 0.0
+var _prev_look := Vector2.ZERO
 var _body_shadow_only := true
 var _melee_swing := 0.0
 var allow_input := true
@@ -312,7 +315,18 @@ func _apply_look(delta: float) -> void:
 	recoil_cam = recoil_cam.lerp(Vector2.ZERO, clampf(delta * 10.0, 0, 1))
 	var shake_amt := shake * float(SaveManager.get_setting("accessibility", "camera_shake", 1.0))
 	var sh := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake_amt * 0.02
-	head.rotation = Vector3(pitch + recoil_cam.y + sh.y, recoil_cam.x + sh.x, slide_tilt)
+	# Scoped breathing sway (8x / sniper only): a slow figure-eight, calmer when crouched or still.
+	var sway := Vector2.ZERO
+	var aw := inv.active()
+	if aw != null and scope_hide and bool(aw.stats.scope_overlay):
+		_sway_t += delta
+		var amp := 0.0022 * (0.5 if crouching else 1.0) * (1.6 if is_moving() else 1.0)
+		sway = Vector2(sin(_sway_t * 0.9) * amp, sin(_sway_t * 1.8) * amp * 0.6)
+	var look := Vector2(yaw, pitch)
+	var dl := (look - _prev_look) / maxf(delta, 0.001)
+	_prev_look = look
+	scope_bob = scope_bob.lerp(Vector2(dl.x * 9.0, -dl.y * 9.0).limit_length(26.0), clampf(delta * 10.0, 0, 1)) if scope_hide else Vector2.ZERO
+	head.rotation = Vector3(pitch + recoil_cam.y + sh.y + sway.y, recoil_cam.x + sh.x + sway.x, slide_tilt)
 	view_model.animate(delta, lk, Vector2(velocity.x, velocity.z).length() / SPRINT_SPEED, is_on_floor(), sprinting)
 
 
@@ -589,7 +603,7 @@ func _update_camera(delta: float) -> void:
 		off = DROP_CAM_OFFSET
 	elif wants_tpp():
 		want = 1.0 - ads_blend
-	cam_tpp = move_toward(cam_tpp, want, delta * 4.0)
+	cam_tpp = move_toward(cam_tpp, want, delta * (9.0 if ads_on else 4.0))
 	var local := off * cam_tpp
 	if cam_tpp > 0.001:
 		var from := head.global_position
