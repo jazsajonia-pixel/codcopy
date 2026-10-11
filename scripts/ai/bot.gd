@@ -16,6 +16,7 @@ var diff := {}
 var agent: NavigationAgent3D
 var model: ActorModel        ## animated body (also owns gun, wingsuit and parachute visuals)
 var gun_holder: Node3D
+var chute_inflate := 1.0
 var chute_open := false      ## BR drop: false = wingsuit freefall, true = parachute
 var name_tag: Label3D
 var aim_dir := Vector3.FORWARD
@@ -345,7 +346,7 @@ func net_apply(pos: Vector3, yaw: float, pitch: float, vel: Vector3, weapon_id: 
 		set_height(height)
 	if weapon_id != _net_weapon and weapon_id != "":
 		_net_weapon = weapon_id
-		inv.load_from_loadout({"primary": weapon_id, "secondary": "pistol_p9", "melee": "knife", "lethal": "frag", "tactical": "smoke"})
+		inv.load_from_loadout({"primary": weapon_id, "melee": "knife", "lethal": "frag", "tactical": "smoke"})
 		_refresh_gun_model()
 
 
@@ -398,6 +399,12 @@ func _act(delta: float) -> void:
 	crouch_t -= delta
 	var w := inv.active()
 	var fire := false
+	# Knife anyone who gets right on top of us (CODM bots love a melee trade).
+	if target and target.alive and reaction_left <= 0.0 and using_item == "" and not downed:
+		var md := global_position.distance_to(target.global_position)
+		if md < 2.1 and (w == null or w.mag == 0 or _rng.randf() < 0.04):
+			if do_melee(eye_position(), (target.aim_point() - eye_position()).normalized()):
+				model.play_melee()
 	if target and target.alive and w and reaction_left <= 0.0 and flash_time < 0.4 and using_item == "":
 		var to := (target.aim_point() - eye_position())
 		var dist := to.length()
@@ -662,6 +669,11 @@ func _standing_teammate() -> Actor:
 	return best
 
 
+func _on_hit_physics(from: Vector3, amount: float) -> void:
+	if model:
+		model.flinch(from, amount / 35.0)
+
+
 func _on_knocked() -> void:
 	state = State.DOWNED
 	target = null
@@ -729,15 +741,18 @@ func _parachute(delta: float) -> void:
 	var agl := _height_above_ground()
 	if not chute_open and agl < Player.CHUTE_AUTO_AGL:
 		chute_open = true
-	var hv := Vector3.ZERO
-	var fall := Player.CHUTE_FALL if chute_open else Player.GLIDE_FALL
+		chute_inflate = 0.0
+	chute_inflate = minf(chute_inflate + delta / DropPhysics.INFLATE_TIME, 1.0) if chute_open else 0.0
+	var wish := Vector3.ZERO
+	var dive := 0.0
 	if to.length() > 2.0:
-		hv = to.normalized() * (Player.CHUTE_SPEED if chute_open else Player.GLIDE_SPEED)
+		wish = to.normalized() * clampf(to.length() / 20.0, 0.3, 1.0)
 		# Dive when the target is close below (falls faster, like players do).
 		if not chute_open and to.length() < agl * 0.5:
-			fall = Player.DIVE_FALL
-			hv *= 0.4
-	velocity = velocity.lerp(Vector3(hv.x, -fall, hv.z), clampf(delta * 2.0, 0, 1))
+			dive = 1.0
+	var facing := -global_transform.basis.z
+	velocity = DropPhysics.step(velocity, wish, facing, dive, chute_open, chute_inflate, 0.0, delta)
+	var hv := Vector3(velocity.x, 0, velocity.z)
 	if hv.length() > 0.5:
 		rotation.y = lerp_angle(rotation.y, atan2(-hv.x, -hv.z), clampf(delta * 3.0, 0, 1))
 	move_and_slide()

@@ -136,6 +136,13 @@ func clear() -> void:
 	for e in _smokes:
 		e.node.visible = false
 		e.t = 99.0
+	for e in _rings:
+		e.node.visible = false
+	for d in _scorches:
+		d.visible = false
+	for k in _bursts.keys():
+		for n in _bursts[k].nodes:
+			n.emitting = false
 	smoke_volumes.clear()
 
 
@@ -182,6 +189,7 @@ func _process(delta: float) -> void:
 			if e.t >= e.dur:
 				e.node.visible = false
 	smoke_volumes = smoke_volumes.filter(func(v): return v.until > now)
+	_tick_rings(delta)
 
 
 func tracer(from: Vector3, to: Vector3) -> void:
@@ -208,7 +216,13 @@ func impact(pos: Vector3, normal: Vector3, flesh: bool = false) -> void:
 	s.node.global_position = pos + normal * 0.03
 	s.node.visible = true
 	s.t = 0.08
-	if flesh or _quality() == 0:
+	if flesh:
+		burst("blood", pos, normal + Vector3.UP * 0.3)
+		return
+	burst("dust", pos, normal)
+	if randf() < 0.35:
+		burst("sparks", pos, normal)
+	if _quality() == 0:
 		return
 	var e: Dictionary = _impacts[_ii]
 	_ii = (_ii + 1) % IMPACTS
@@ -286,3 +300,330 @@ func smoke_trail(parent: Node3D, offset: Vector3) -> GPUParticles3D:
 	p.draw_pass_1 = q
 	parent.add_child(p)
 	return p
+
+
+# ---------------------------------------------------------------------------------------------
+# Particle bursts (pooled one-shot GPUParticles3D): blood, impact dust / sparks, debris, fire,
+# smoke puffs, shell casings, landing dust, water splashes, shockwave rings and scorch decals.
+
+const BURST_POOL := {"blood": 10, "dust": 12, "sparks": 10, "debris": 4, "fire": 4, "smoke": 6,
+	"shell": 10, "land": 4, "splash": 4, "chunks": 4}
+var _bursts := {}
+var _soft_tex: Texture2D
+var _rings: Array = []
+var _scorches: Array = []
+var _ri := 0
+var _sci := 0
+
+
+func _soft() -> Texture2D:
+	if _soft_tex == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		var gt := GradientTexture2D.new()
+		gt.gradient = g
+		gt.fill = GradientTexture2D.FILL_RADIAL
+		gt.fill_from = Vector2(0.5, 0.5)
+		gt.fill_to = Vector2(1.0, 0.5)
+		gt.width = 64
+		gt.height = 64
+		_soft_tex = gt
+	return _soft_tex
+
+
+func _particle_mat(additive := false) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.albedo_texture = _soft()
+	if additive:
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	return m
+
+
+func _ramp(cols: Array) -> GradientTexture1D:
+	var g := Gradient.new()
+	g.remove_point(1)
+	g.set_color(0, cols[0])
+	for i in range(1, cols.size()):
+		g.add_point(float(i) / (cols.size() - 1), cols[i])
+	var t := GradientTexture1D.new()
+	t.gradient = g
+	return t
+
+
+func _make_burst(kind: String) -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.one_shot = true
+	p.emitting = false
+	p.explosiveness = 0.95
+	p.local_coords = false
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var pm := ParticleProcessMaterial.new()
+	pm.direction = Vector3.UP
+	var q := QuadMesh.new()
+	q.size = Vector2(0.2, 0.2)
+	var mat := _particle_mat()
+	match kind:
+		"blood":
+			p.amount = 14
+			p.lifetime = 0.55
+			pm.spread = 35.0
+			pm.initial_velocity_min = 1.5
+			pm.initial_velocity_max = 4.0
+			pm.gravity = Vector3(0, -9.8, 0)
+			pm.scale_min = 0.35
+			pm.scale_max = 0.9
+			pm.color_ramp = _ramp([Color(0.75, 0.02, 0.02, 1), Color(0.45, 0.0, 0.0, 0.0)])
+			q.size = Vector2(0.14, 0.14)
+		"dust":
+			p.amount = 8
+			p.lifetime = 0.7
+			pm.spread = 30.0
+			pm.initial_velocity_min = 0.6
+			pm.initial_velocity_max = 2.0
+			pm.gravity = Vector3(0, -1.0, 0)
+			pm.damping_min = 2.0
+			pm.damping_max = 3.0
+			pm.scale_min = 0.6
+			pm.scale_max = 1.4
+			pm.color_ramp = _ramp([Color(0.75, 0.7, 0.6, 0.6), Color(0.6, 0.57, 0.5, 0.0)])
+			q.size = Vector2(0.3, 0.3)
+		"sparks":
+			p.amount = 10
+			p.lifetime = 0.3
+			pm.spread = 50.0
+			pm.initial_velocity_min = 3.0
+			pm.initial_velocity_max = 8.0
+			pm.gravity = Vector3(0, -12.0, 0)
+			pm.scale_min = 0.15
+			pm.scale_max = 0.3
+			pm.color_ramp = _ramp([Color(1, 0.9, 0.5, 1), Color(1, 0.45, 0.1, 0)])
+			mat = _particle_mat(true)
+			q.size = Vector2(0.1, 0.1)
+		"debris", "chunks":
+			p.amount = 18 if kind == "debris" else 10
+			p.lifetime = 1.6
+			pm.spread = 70.0
+			pm.initial_velocity_min = 5.0
+			pm.initial_velocity_max = 13.0
+			pm.gravity = Vector3(0, -18.0, 0)
+			pm.angular_velocity_min = -500.0
+			pm.angular_velocity_max = 500.0
+			pm.scale_min = 0.5
+			pm.scale_max = 1.3
+			pm.color_ramp = _ramp([Color(0.18, 0.16, 0.14, 1), Color(0.18, 0.16, 0.14, 1), Color(0.18, 0.16, 0.14, 0)])
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.12, 0.08, 0.1)
+			var dm := StandardMaterial3D.new()
+			dm.vertex_color_use_as_albedo = true
+			dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			bm.material = dm
+			p.draw_pass_1 = bm
+			p.process_material = pm
+			return p
+		"fire":
+			p.amount = 22
+			p.lifetime = 0.75
+			pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+			pm.emission_sphere_radius = 0.8
+			pm.spread = 180.0
+			pm.initial_velocity_min = 2.0
+			pm.initial_velocity_max = 6.0
+			pm.gravity = Vector3(0, 3.0, 0)
+			pm.damping_min = 4.0
+			pm.damping_max = 6.0
+			pm.scale_min = 2.0
+			pm.scale_max = 4.0
+			pm.color_ramp = _ramp([Color(1, 0.95, 0.6, 1), Color(1, 0.55, 0.12, 0.9), Color(0.35, 0.12, 0.05, 0.0)])
+			mat = _particle_mat(true)
+			q.size = Vector2(0.9, 0.9)
+		"smoke":
+			p.amount = 16
+			p.lifetime = 3.2
+			p.explosiveness = 0.75
+			pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+			pm.emission_sphere_radius = 1.0
+			pm.spread = 60.0
+			pm.initial_velocity_min = 1.0
+			pm.initial_velocity_max = 3.0
+			pm.gravity = Vector3(0, 1.2, 0)
+			pm.damping_min = 1.0
+			pm.damping_max = 2.0
+			pm.scale_min = 3.0
+			pm.scale_max = 5.5
+			pm.color_ramp = _ramp([Color(0.25, 0.23, 0.22, 0.0), Color(0.22, 0.21, 0.2, 0.65), Color(0.4, 0.4, 0.4, 0.0)])
+			q.size = Vector2(1.0, 1.0)
+		"shell":
+			p.amount = 1
+			p.lifetime = 0.9
+			p.explosiveness = 1.0
+			pm.direction = Vector3(1, 0.8, 0.2)
+			pm.spread = 12.0
+			pm.initial_velocity_min = 1.6
+			pm.initial_velocity_max = 2.4
+			pm.gravity = Vector3(0, -9.8, 0)
+			pm.angular_velocity_min = -720.0
+			pm.angular_velocity_max = 720.0
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.0045
+			cm.bottom_radius = 0.0045
+			cm.height = 0.022
+			cm.radial_segments = 6
+			cm.rings = 1
+			var sm := StandardMaterial3D.new()
+			sm.albedo_color = Color(0.85, 0.65, 0.25)
+			sm.metallic = 0.8
+			sm.roughness = 0.35
+			cm.material = sm
+			p.draw_pass_1 = cm
+			p.process_material = pm
+			return p
+		"land":
+			p.amount = 16
+			p.lifetime = 0.8
+			pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+			pm.emission_ring_axis = Vector3.UP
+			pm.emission_ring_radius = 0.4
+			pm.emission_ring_inner_radius = 0.2
+			pm.emission_ring_height = 0.05
+			pm.direction = Vector3(0, 0.2, 0)
+			pm.spread = 90.0
+			pm.flatness = 0.9
+			pm.initial_velocity_min = 2.0
+			pm.initial_velocity_max = 3.5
+			pm.damping_min = 4.0
+			pm.damping_max = 5.0
+			pm.scale_min = 0.8
+			pm.scale_max = 1.5
+			pm.color_ramp = _ramp([Color(0.75, 0.7, 0.6, 0.55), Color(0.7, 0.66, 0.58, 0.0)])
+			q.size = Vector2(0.5, 0.5)
+		"splash":
+			p.amount = 18
+			p.lifetime = 0.8
+			pm.spread = 25.0
+			pm.initial_velocity_min = 2.0
+			pm.initial_velocity_max = 5.5
+			pm.gravity = Vector3(0, -12.0, 0)
+			pm.scale_min = 0.4
+			pm.scale_max = 1.0
+			pm.color_ramp = _ramp([Color(0.85, 0.95, 1.0, 0.9), Color(0.7, 0.85, 1.0, 0.0)])
+			q.size = Vector2(0.25, 0.25)
+	q.material = mat
+	p.draw_pass_1 = q
+	p.process_material = pm
+	return p
+
+
+## Fire a pooled burst at pos, spraying along dir. scale grows the emitter (explosions).
+func burst(kind: String, pos: Vector3, dir: Vector3 = Vector3.UP, scale: float = 1.0) -> void:
+	if not BURST_POOL.has(kind) or not is_inside_tree():
+		return
+	if _quality() == 0 and kind in ["dust", "shell", "land", "smoke"] and randf() < 0.6:
+		return
+	if not _bursts.has(kind):
+		var arr: Array = []
+		for i in BURST_POOL[kind]:
+			var e := _make_burst(kind)
+			add_child(e)
+			arr.append(e)
+		_bursts[kind] = {"nodes": arr, "i": 0}
+	var pool: Dictionary = _bursts[kind]
+	var p: GPUParticles3D = pool.nodes[pool.i]
+	pool.i = (int(pool.i) + 1) % pool.nodes.size()
+	var d := dir.normalized() if dir.length() > 0.001 else Vector3.UP
+	var ref := Vector3.FORWARD if absf(d.y) > 0.95 else Vector3.UP
+	# Particle "direction" is local +Y; build a basis whose Y axis points along d.
+	var x := ref.cross(d).normalized()
+	var b := Basis(x, d, x.cross(d).normalized())
+	p.global_transform = Transform3D(b.scaled(Vector3.ONE * scale), pos)
+	p.restart()
+
+
+## Brass casing flicked out of the ejection port (basis = weapon orientation, +X = to the right).
+func shell_eject(pos: Vector3, basis: Basis) -> void:
+	if _quality() == 0:
+		return
+	if not _bursts.has("shell"):
+		burst("shell", Vector3(0, -1000, 0))
+	var pool: Dictionary = _bursts["shell"]
+	var p: GPUParticles3D = pool.nodes[pool.i]
+	pool.i = (int(pool.i) + 1) % pool.nodes.size()
+	p.global_transform = Transform3D(basis.orthonormalized(), pos)
+	p.restart()
+
+
+## Expanding ground ring + scorch decal used by big explosions.
+func _shockwave(pos: Vector3, radius: float) -> void:
+	if _rings.is_empty():
+		for i in 3:
+			var mi := MeshInstance3D.new()
+			var tm := TorusMesh.new()
+			tm.inner_radius = 0.92
+			tm.outer_radius = 1.0
+			tm.rings = 24
+			tm.ring_segments = 4
+			mi.mesh = tm
+			var m := _unshaded(Color(1.0, 0.85, 0.6, 0.6))
+			m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+			mi.material_override = m
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.visible = false
+			add_child(mi)
+			_rings.append({"node": mi, "mat": m, "t": 9.0, "r": 5.0})
+		for i in 8:
+			var dc := Decal.new()
+			dc.size = Vector3(4, 2, 4)
+			var g := Gradient.new()
+			g.set_color(0, Color(0.02, 0.02, 0.02, 0.85))
+			g.set_color(1, Color(0.05, 0.05, 0.05, 0.0))
+			var gt := GradientTexture2D.new()
+			gt.gradient = g
+			gt.fill = GradientTexture2D.FILL_RADIAL
+			gt.fill_from = Vector2(0.5, 0.5)
+			gt.fill_to = Vector2(1.0, 0.5)
+			dc.texture_albedo = gt
+			dc.visible = false
+			add_child(dc)
+			_scorches.append(dc)
+	var e: Dictionary = _rings[_ri]
+	_ri = (_ri + 1) % _rings.size()
+	e.node.global_position = pos + Vector3.UP * 0.15
+	e.r = radius
+	e.t = 0.0
+	e.node.visible = true
+	var dcl: Decal = _scorches[_sci]
+	_sci = (_sci + 1) % _scorches.size()
+	dcl.size = Vector3(radius * 0.9, 2.5, radius * 0.9)
+	dcl.global_position = pos
+	dcl.rotation.y = randf() * TAU
+	dcl.visible = true
+
+
+func _tick_rings(delta: float) -> void:
+	for e in _rings:
+		if e.node.visible:
+			e.t += delta
+			var k: float = e.t / 0.35
+			e.node.scale = Vector3(1, 0.4, 1) * lerpf(0.5, e.r * 1.4, minf(k, 1.0))
+			e.mat.albedo_color.a = clampf(0.6 * (1.0 - k), 0.0, 0.6)
+			if k >= 1.0:
+				e.node.visible = false
+
+
+## Full explosion package: fireball + smoke column + debris + shockwave + scorch.
+func big_explosion(pos: Vector3, radius: float) -> void:
+	explosion(pos, radius)
+	burst("fire", pos + Vector3.UP * 0.4, Vector3.UP, clampf(radius / 6.0, 0.6, 2.0))
+	burst("smoke", pos + Vector3.UP * 0.8, Vector3.UP, clampf(radius / 6.0, 0.6, 2.0))
+	if _quality() > 0:
+		burst("debris", pos + Vector3.UP * 0.2, Vector3.UP, 1.0)
+		_shockwave(pos, radius)
+
+
+func muzzle_smoke(pos: Vector3, dir: Vector3) -> void:
+	if _quality() >= 2 or randf() < 0.35:
+		burst("dust", pos, dir, 0.5)

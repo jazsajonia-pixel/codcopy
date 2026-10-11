@@ -20,11 +20,11 @@ const SLIDE_END_SPEED := 4.0
 const SLIDE_TIME := 0.95
 const SLIDE_MIN_SPRINT := 0.2     ## seconds of sprinting needed before crouch becomes a slide
 # Battle Royale drop (also used by bots): wingsuit glide, dive, parachute.
-const GLIDE_FALL := 15.0          ## m/s down while gliding level
-const GLIDE_SPEED := 27.0         ## m/s forward while gliding
-const DIVE_FALL := 42.0           ## m/s down when diving straight down
-const CHUTE_FALL := 5.5
-const CHUTE_SPEED := 10.0
+
+
+
+
+
 const CHUTE_AUTO_AGL := 45.0      ## parachute opens by itself below this height
 const CHUTE_MIN_CUT_AGL := 28.0   ## can't close the parachute below this height
 const TPP_OFFSET := Vector3(1.1, 0.5, 3.4)
@@ -63,6 +63,9 @@ var death_cam_target: Actor = null
 var death_time := 0.0
 var touch_mode := false
 var parachute_state := 0          ## 0 none, 1 wingsuit freefall, 2 parachute (set by BR deploy)
+var chute_inflate := 1.0          ## 0..1 canopy inflation after opening
+var drop_accel := Vector3.ZERO    ## horizontal acceleration while dropping (canopy swing)
+var drop_speed_y := 0.0
 var drop_grace := 0.0             ## ignore chute toggles right after leaving the aircraft
 var agl := 0.0                    ## height above ground while dropping
 var body: ActorModel              ## own animated body: third-person view, first-person shadow
@@ -571,24 +574,32 @@ func _parachute_move(delta: float) -> void:
 	if parachute_state == 1 and agl < CHUTE_AUTO_AGL:
 		_open_chute()
 	var wish := (transform.basis * Vector3(input.move.x, 0, input.move.y)).limit_length(1.0)
-	var fall := CHUTE_FALL
-	var horiz := CHUTE_SPEED * wish.length()
-	if parachute_state == 1:
-		var dive := clampf((-pitch - deg_to_rad(15.0)) / deg_to_rad(60.0), 0.0, 1.0)
-		var push := clampf(-input.move.y, 0.0, 1.0)
-		fall = lerpf(lerpf(GLIDE_FALL * 1.5, GLIDE_FALL, push), DIVE_FALL, dive)
-		horiz = wish.length() * GLIDE_SPEED * (1.0 - 0.45 * dive)
-	var hv := Vector3(velocity.x, 0, velocity.z).lerp(wish.normalized() * horiz if wish.length() > 0.05 else Vector3.ZERO, clampf(delta * 1.6, 0, 1))
-	velocity = Vector3(hv.x, move_toward(velocity.y, -fall, delta * 24.0), hv.z)
+	var facing := -transform.basis.z
+	var dive := clampf((-pitch - deg_to_rad(15.0)) / deg_to_rad(60.0), 0.0, 1.0) if parachute_state == 1 else 0.0
+	var brake := clampf(input.move.y, 0.0, 1.0) if parachute_state == 2 else 0.0
+	if parachute_state == 2:
+		chute_inflate = minf(chute_inflate + delta / DropPhysics.INFLATE_TIME, 1.0)
+		if brake > 0.0:
+			wish = transform.basis.x * input.move.x * 0.6   # pulling back flares instead of reversing
+	var prev_h := Vector3(velocity.x, 0, velocity.z)
+	velocity = DropPhysics.step(velocity, wish, facing, dive, parachute_state == 2, chute_inflate, brake, delta)
+	drop_accel = (Vector3(velocity.x, 0, velocity.z) - prev_h) / maxf(delta, 0.001)
 	move_and_slide()
 	if is_on_floor():
+		var impact := absf(drop_speed_y)
 		parachute_state = 0
-		land_dip = 0.15
+		land_dip = clampf(0.1 + impact * 0.02, 0.1, 0.3)
+		Effects.burst("land", global_position + Vector3.UP * 0.05, Vector3.UP, 1.0 + impact * 0.05)
 		AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -4.0)
+	drop_speed_y = velocity.y
 
 
 func _open_chute() -> void:
 	parachute_state = 2
+	chute_inflate = 0.0
+	# Opening shock: the harness yanks you upright.
+	add_shake(0.35 + clampf(-velocity.y / 50.0, 0.0, 1.0) * 0.5)
+	recoil_cam.y += deg_to_rad(-6.0)
 	AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -2.0, 0.6)
 
 
@@ -799,6 +810,15 @@ func net_hurt(from_pos: Vector3, attacker: Actor) -> void:
 	_since_damage = 0.0
 	_cancel_use()
 	damaged.emit(1.0, from_pos, attacker)
+
+
+## Getting shot punches the view slightly away from the hit (CODM-style flinch).
+func _on_hit_physics(from: Vector3, amount: float) -> void:
+	var to := from - global_position
+	var side := signf(to.dot(global_transform.basis.x)) if to.length() > 0.1 else 0.0
+	recoil_cam += Vector2(deg_to_rad(-side * 0.8), deg_to_rad(0.9)) * clampf(amount / 30.0, 0.3, 2.0)
+	if body:
+		body.flinch(from, amount / 35.0)
 
 
 func _on_knocked() -> void:

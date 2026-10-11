@@ -53,9 +53,16 @@ static func fire_hitscan(shooter: Actor, origin: Vector3, dir: Vector3, w: Weapo
 					res.kills += 1
 				Effects.impact(hit.position, hit.normal, true)
 			else:
+				var pdmg := _damage_at(w.stats, origin.distance_to(hit.position))
 				if col != null and col.has_method("take_vehicle_damage"):
-					col.take_vehicle_damage(_damage_at(w.stats, origin.distance_to(hit.position)) * 0.6, shooter)
+					col.take_vehicle_damage(pdmg * 0.6, shooter)
 					res.hits += 1
+				# Physics props: bullets push loose objects; barrels / crates take damage.
+				if col is RigidBody3D:
+					var rb: RigidBody3D = col
+					rb.apply_impulse(d * pdmg * 0.035, hit.position - rb.global_position)
+				if col != null and col.has_method("take_prop_damage"):
+					col.take_prop_damage(pdmg, shooter)
 				Effects.impact(hit.position, hit.normal, false)
 				if i == 0:
 					AudioManager.play_3d("res://assets/audio/sfx/bullet_impact.ogg", hit.position, -14.0, randf_range(0.9, 1.15), 25.0)
@@ -128,7 +135,24 @@ static func explode(source: Actor, pos: Vector3, radius: float, damage: float, w
 			continue
 		a.take_damage(dmg, source, weapon_name, false, pos)
 		a.add_shake(0.6 * falloff + 0.2)
+		# Blast pushes survivors away (and pops them off the ground a little).
+		var away := center - pos
+		away.y = 0.0
+		a.apply_knockback(away.normalized() * 8.0 * falloff + Vector3.UP * 3.5 * falloff)
 		n += 1
+	# Loose physics props get thrown; explosive props chain-react.
+	for node in tree.get_nodes_in_group("physics_props"):
+		var rb := node as RigidBody3D
+		if rb == null or not rb.is_inside_tree():
+			continue
+		var pd := pos.distance_to(rb.global_position)
+		if pd > radius * 1.4:
+			continue
+		var pf := clampf(1.0 - pd / (radius * 1.4), 0.0, 1.0)
+		var dirp := (rb.global_position - pos + Vector3.UP * 0.6).normalized()
+		rb.apply_impulse(dirp * rb.mass * 11.0 * pf, Vector3(randf_range(-0.2, 0.2), 0.2, randf_range(-0.2, 0.2)))
+		if rb.has_method("take_prop_damage"):
+			rb.take_prop_damage(damage * pf, source)
 	for node in tree.get_nodes_in_group("vehicles"):
 		var v: Node3D = node
 		var vd := pos.distance_to(v.global_position + Vector3.UP * 0.8)

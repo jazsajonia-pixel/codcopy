@@ -53,7 +53,7 @@ func _ready() -> void:
 func _add_bot(team: int) -> Bot:
 	var bot := spawn_bot(team)
 	var prim: Array = GameDB.weapon_ids_for_slot("primary")
-	var lo := {"primary": prim[rng.randi() % prim.size()], "secondary": "pistol_p9", "melee": "knife", "lethal": "frag", "tactical": "smoke"}
+	var lo := {"primary": prim[rng.randi() % prim.size()], "melee": "knife", "lethal": "frag", "tactical": "smoke"}
 	if rng.randf() < 0.5:
 		lo.attachments = {lo.primary: {"optic": "red_dot"}}
 	bot.inv.load_from_loadout(lo)
@@ -266,7 +266,7 @@ func _spawn_puppet(id: int, pname: String, team: int, op: String, is_bot: bool) 
 	if not is_bot:
 		b.name_tag.text = pname
 	var prim: Array = GameDB.weapon_ids_for_slot("primary")
-	b.inv.load_from_loadout({"primary": prim[0], "secondary": "pistol_p9", "melee": "knife", "lethal": "frag", "tactical": "smoke"})
+	b.inv.load_from_loadout({"primary": prim[0], "melee": "knife", "lethal": "frag", "tactical": "smoke"})
 	b._refresh_gun_model()
 	return b
 

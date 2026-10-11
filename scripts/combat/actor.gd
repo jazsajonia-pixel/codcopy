@@ -56,6 +56,8 @@ var regen_rate := 30.0
 var invulnerable_time := 0.0
 var current_height := HEIGHT
 
+var last_hit_from := Vector3.ZERO   ## where the most recent damage came from (death physics)
+var last_hit_force := 1.0           ## 1 = bullet, ~3+ = explosion / heavy hit
 var inv := Inventory.new()
 var operator_id := "op_ranger"
 
@@ -142,6 +144,11 @@ func take_damage(amount: float, attacker: Actor, weapon_name: String = "", heads
 		dmg -= absorbed
 	health -= dmg
 	_since_damage = 0.0
+	last_hit_from = from_pos if from_pos != Vector3.ZERO else (attacker.global_position if attacker else global_position + Vector3(0, 0, 1))
+	last_hit_force = clampf(amount / 45.0, 0.6, 1.8)
+	if weapon_name in Actor.EXPLOSIVE_NAMES or amount >= 120.0:
+		last_hit_force = 3.5
+	_on_hit_physics(from_pos if from_pos != Vector3.ZERO else last_hit_from, amount)
 	if attacker and attacker != self:
 		_damagers[attacker] = Time.get_ticks_msec()
 		attacker.shots_hit += 1
@@ -157,6 +164,21 @@ func take_damage(amount: float, attacker: Actor, weapon_name: String = "", heads
 		_die(attacker if attacker else knocked_by, weapon_name if attacker else knocked_weapon, headshot)
 		return true
 	return false
+
+
+const EXPLOSIVE_NAMES := ["Frag Grenade", "Sticky Charge", "Explosion", "Viper RL", "Thumper GL", "Vehicle explosion", "Airstrike", "Barrel"]
+
+
+## Instant velocity change from blasts / vehicle hits.
+func apply_knockback(v: Vector3) -> void:
+	if not alive:
+		return
+	velocity += v
+
+
+## Hook for flinch / knock-back (bots and the player override the visuals).
+func _on_hit_physics(_from: Vector3, _amount: float) -> void:
+	pass
 
 
 func _knock(attacker: Actor, weapon_name: String) -> void:

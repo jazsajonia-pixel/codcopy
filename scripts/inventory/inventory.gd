@@ -59,10 +59,13 @@ func switch_to(slot: int) -> bool:
 	return true
 
 
+## Next weapon. With a single gun (Multiplayer) this toggles between the gun and the melee weapon.
 func cycle() -> bool:
 	if holstered:
 		return switch_to(current) or switch_to((current + 1) % MAX_WEAPONS)
-	return switch_to((current + 1) % MAX_WEAPONS)
+	if switch_to((current + 1) % MAX_WEAPONS):
+		return true
+	return weapons[(current + 1) % MAX_WEAPONS] == null and has_any_weapon() and holster()
 
 
 ## Put weapons away (fists / melee). Returns false if already holstered.
@@ -130,14 +133,17 @@ func best_heal() -> String:
 	return ""
 
 
-## Fill from a saved loadout (Multiplayer).
-func load_from_loadout(lo: Dictionary) -> void:
+## Fill from a saved loadout (Multiplayer). Multiplayer is one gun + melee (CODM-lite rules):
+## the secondary slot stays empty unless the caller explicitly passes with_secondary.
+func load_from_loadout(lo: Dictionary, with_secondary: bool = false) -> void:
 	use_ammo_pools = false
 	var att: Dictionary = lo.get("attachments", {})
 	var skins: Dictionary = lo.get("skins", {})
 	set_weapon(0, WeaponInstance.create(lo.primary, att.get(lo.primary, {}), skins.get(lo.primary, "default")))
-	set_weapon(1, WeaponInstance.create(lo.secondary, att.get(lo.secondary, {}), skins.get(lo.secondary, "default")))
+	var sec: String = lo.get("secondary", "")
+	set_weapon(1, WeaponInstance.create(sec, att.get(sec, {}), skins.get(sec, "default")) if with_secondary and sec != "" else null)
 	current = 0
+	holstered = false
 	melee = lo.get("melee", "knife")
 	lethal = lo.get("lethal", "frag")
 	lethal_count = GameDB.EQUIPMENT.get(lethal, {}).get("count", 1)

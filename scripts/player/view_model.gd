@@ -243,6 +243,10 @@ func on_shot() -> void:
 		flash.scale = Vector3.ONE * 0.4
 	else:
 		flash.scale = Vector3.ONE * randf_range(0.8, 1.2)
+	if is_inside_tree() and gun != null and weapon.data.category != "LAUNCHER":
+		var gb := gun.global_transform.basis.orthonormalized()
+		Effects.shell_eject(gun.global_position + gb.x * 0.03 + gb.y * 0.06 - gb.z * 0.1, gb)
+		Effects.muzzle_smoke(flash.global_position, -gb.z)
 
 
 func on_melee() -> void:

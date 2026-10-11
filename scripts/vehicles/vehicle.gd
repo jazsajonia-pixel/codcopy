@@ -359,7 +359,7 @@ func _explode() -> void:
 	for a in occupants():
 		exit(a)
 		a.take_damage(120.0, killer, "Vehicle explosion", false, global_position)
-	Effects.explosion(global_position + Vector3.UP * 0.8, 1.6)
+	Effects.big_explosion(global_position + Vector3.UP * 0.8, 5.0)
 	AudioManager.play_3d("res://assets/audio/sfx/explosion.ogg", global_position, 4.0, 0.8, 140.0)
 	Combat.explode(killer, global_position + Vector3.UP * 0.8, 7.0, 110.0, "Vehicle explosion", get_world_3d(), get_tree())
 	# Burnt-out look

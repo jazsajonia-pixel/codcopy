@@ -2,7 +2,7 @@ class_name WeaponBar
 extends Control
 ## CODM-style weapon switcher at the bottom of the HUD.
 ## Battle Royale: every slot is visible (weapon 1, weapon 2, fists) - tap / press 1, 2, 3 to equip.
-## Multiplayer: the equipped weapon (tap or Q to swap to the other one) and the knife (quick melee).
+## Multiplayer: one gun + melee (tap a card or press Q to swap between them; V is quick melee).
 
 const CARD := Vector2(196, 70)
 const SMALL := Vector2(70, 70)
@@ -74,8 +74,12 @@ func _activate(id: String) -> void:
 		"slot0": inp.select_slot = 0
 		"slot1": inp.select_slot = 1
 		"fists": inp.select_slot = 2
-		"weapon": inp.switch_weapon = true
-		"knife": inp.melee = true
+		"weapon": inp.select_slot = 0
+		"knife":
+			if player.inv.holstered:
+				inp.melee = true
+			else:
+				inp.select_slot = 2
 
 
 func _draw() -> void:
@@ -100,11 +104,12 @@ func _card(rc: Rect2, id: String) -> void:
 			active = inv.holstered or not inv.has_any_weapon()
 			hint = "3"
 		"weapon":
-			w = inv.active()
-			active = w != null
-			hint = "Q"
+			w = inv.weapons[inv.current] if inv.weapons[inv.current] != null else inv.weapons[0]
+			active = w != null and not inv.holstered
+			hint = "1"
 		"knife":
-			hint = "V"
+			active = inv.holstered
+			hint = "Q"
 	var a := fade
 	var bg := Color(0.05, 0.06, 0.07, 0.62 * a) if not active else Color(0.12, 0.13, 0.1, 0.78 * a)
 	draw_rect(rc, bg)
@@ -114,7 +119,8 @@ func _card(rc: Rect2, id: String) -> void:
 	var fs := int(13 * rc.size.y / 70.0)
 	if id in ["fists", "knife"]:
 		_knife_glyph(rc, a * (1.0 if active or id == "knife" else 0.75))
-		_text(Vector2(rc.position.x + rc.size.x * 0.5, rc.end.y - 8), "FISTS" if inv.melee == "" else "KNIFE", fs - 1, Color(1, 1, 1, 0.8 * a), true)
+		var mname: String = "FISTS" if inv.melee == "" else str(GameDB.MELEE.get(inv.melee, GameDB.MELEE.knife).get("short", "KNIFE"))
+		_text(Vector2(rc.position.x + rc.size.x * 0.5, rc.end.y - 8), mname, fs - 1, Color(1, 1, 1, 0.8 * a), true)
 	elif w == null:
 		_text(rc.get_center() + Vector2(0, fs * 0.4), "EMPTY", fs + 2, Color(1, 1, 1, 0.35 * a), true)
 	else:
@@ -134,10 +140,6 @@ func _card(rc: Rect2, id: String) -> void:
 		_text_right(Vector2(rc.end.x - 8, rc.end.y - 7), ammo, fs + 2, col)
 		if w.reloading:
 			draw_rect(Rect2(rc.position.x, rc.end.y - 3, rc.size.x * w.reload_progress(), 3), Color(1, 1, 1, 0.9 * a))
-		if id == "weapon":
-			var other: WeaponInstance = inv.weapons[(inv.current + 1) % Inventory.MAX_WEAPONS]
-			if other:
-				_text(rc.position + Vector2(8, rc.size.y - 7), "SWAP: " + other.data.display_name, fs - 2, Color(1, 1, 1, 0.55 * a), false)
 	if not touch and hint != "":
 		var hp := rc.position + Vector2(rc.size.x - 14, 15)
 		draw_rect(Rect2(hp - Vector2(7, 11), Vector2(16, 15)), Color(0, 0, 0, 0.5 * a))

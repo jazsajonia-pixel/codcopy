@@ -66,7 +66,7 @@ func _detonate() -> void:
 	var pos := global_position
 	match equip_id:
 		"frag", "semtex":
-			Effects.explosion(pos, data.radius)
+			Effects.big_explosion(pos, data.radius)
 			AudioManager.play_3d("res://assets/audio/sfx/explosion.ogg", pos, 4.0, randf_range(0.9, 1.05), 200.0)
 			Combat.explode(thrower if is_instance_valid(thrower) else null, pos, data.radius, data.damage, data.name, get_world_3d(), get_tree())
 		"smoke":
