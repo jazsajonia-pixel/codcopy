@@ -1,22 +1,28 @@
 extends GameMap
-## "Isla Verde" — Battle Royale island (~340 m across) with generated terrain and six points of interest.
-## Kept intentionally compact for mobile: 2 m terrain grid, box colliders, distance-culled props.
+## "Isla Verde" — Battle Royale island (~560 m across) with generated terrain and nine points of interest,
+## including an airfield and a military base with helicopters.
+## Mobile budget: 3 m terrain grid, box colliders, distance-culled props.
 
 const CITY := "res://assets/maps/city/"
 const SURV := "res://assets/maps/survival/"
 const VEH := "res://assets/vehicles/"
-const HALF := 200.0
-const GRID := 2.0
-const ISLAND_R := 165.0
+const TOON := "res://assets/props/toon/"
+const HALF := 330.0
+const GRID := 3.0
+const ISLAND_R := 272.0
+const S := 1.6   ## scale applied to the original (165 m) layout
 
 var noise := FastNoiseLite.new()
 var poi_defs := [
-	{"name": "Harbor Town", "pos": Vector2(-95, 70), "r": 38.0},
-	{"name": "Depot", "pos": Vector2(85, 80), "r": 36.0},
-	{"name": "Farmstead", "pos": Vector2(-85, -80), "r": 32.0},
-	{"name": "Radar Hill", "pos": Vector2(70, -75), "r": 26.0},
-	{"name": "Crossing", "pos": Vector2(0, 5), "r": 30.0},
-	{"name": "Pine Ridge", "pos": Vector2(-10, -105), "r": 24.0},
+	{"name": "Harbor Town", "pos": Vector2(-95, 70) * S, "r": 38.0},
+	{"name": "Depot", "pos": Vector2(85, 80) * S, "r": 36.0},
+	{"name": "Farmstead", "pos": Vector2(-85, -80) * S, "r": 32.0},
+	{"name": "Radar Hill", "pos": Vector2(70, -75) * S, "r": 26.0},
+	{"name": "Crossing", "pos": Vector2(0, 5) * S, "r": 30.0},
+	{"name": "Pine Ridge", "pos": Vector2(-10, -105) * S, "r": 24.0},
+	{"name": "Airfield", "pos": Vector2(185, -5), "r": 58.0},
+	{"name": "Military Base", "pos": Vector2(-190, -5), "r": 42.0},
+	{"name": "Fishing Village", "pos": Vector2(-5, 200), "r": 32.0},
 ]
 
 
@@ -24,7 +30,7 @@ func build() -> void:
 	map_name = "Isla Verde"
 	bounds = Rect2(-HALF, -HALF, HALF * 2, HALF * 2)
 	noise.seed = 4242
-	noise.frequency = 0.0085
+	noise.frequency = 0.0085 / S
 	noise.fractal_octaves = 3
 	for p in poi_defs:
 		p.base = _raw_height(p.pos.x, p.pos.y)
@@ -37,11 +43,15 @@ func build() -> void:
 	_radar(poi_defs[3])
 	_crossing(poi_defs[4])
 	_pine_ridge(poi_defs[5])
+	_airfield(poi_defs[6])
+	_military_base(poi_defs[7])
+	_fishing_village(poi_defs[8])
+	_roads()
 	_scatter()
 	for p in poi_defs:
 		pois.append({"name": p.name, "pos": Vector3(p.pos.x, height(p.pos.x, p.pos.y), p.pos.y)})
 		patrol_points.append(Vector3(p.pos.x, height(p.pos.x, p.pos.y), p.pos.y))
-	for i in 40:
+	for i in 70:
 		var a := b.rng.randf() * TAU
 		var r := sqrt(b.rng.randf()) * (ISLAND_R - 25.0)
 		var x := cos(a) * r
@@ -57,7 +67,7 @@ func build() -> void:
 
 ## Two drivable vehicles near every POI, on the flattest nearby ground that is clear of buildings.
 func _vehicle_spawns() -> void:
-	var kinds := ["suv", "sedan", "truck", "police", "van", "suv"]
+	var kinds := ["suv", "sedan", "truck", "police", "van", "suv", "truck", "suv", "van"]
 	var vi := 0
 	for p in poi_defs:
 		var placed := 0
@@ -92,8 +102,11 @@ func _raw_height(x: float, z: float) -> float:
 	var r := Vector2(x, z).length()
 	var h := 2.5 + noise.get_noise_2d(x, z) * 7.0
 	# Radar hill
-	h += 13.0 * exp(-Vector2(x - 70, z + 75).length_squared() / (2.0 * 32.0 * 32.0))
-	h += 6.0 * exp(-Vector2(x + 10, z + 105).length_squared() / (2.0 * 30.0 * 30.0))
+	h += 15.0 * exp(-Vector2(x - 70 * S, z + 75 * S).length_squared() / (2.0 * 48.0 * 48.0))
+	h += 8.0 * exp(-Vector2(x + 10 * S, z + 105 * S).length_squared() / (2.0 * 45.0 * 45.0))
+	# Central mountain ridge between the airfield and the town, and northern hills
+	h += 18.0 * exp(-Vector2(x - 90, z + 10).length_squared() / (2.0 * 30.0 * 30.0))
+	h += 10.0 * exp(-Vector2(x + 110, z + 170).length_squared() / (2.0 * 40.0 * 40.0))
 	# Coastline
 	var coast := smoothstep(ISLAND_R - 30.0, ISLAND_R + 12.0, r)
 	return lerpf(h, -4.0, coast)
@@ -122,7 +135,7 @@ func _terrain() -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for j in n:
 		for i in n:
-			var h := heights[j * n + i]
+			var h: float = heights[j * n + i]
 			var hx := heights[j * n + mini(i + 1, n - 1)] - heights[j * n + maxi(i - 1, 0)]
 			var hz := heights[mini(j + 1, n - 1) * n + i] - heights[maxi(j - 1, 0) * n + i]
 			var normal := Vector3(-hx, 2.0 * GRID, -hz).normalized()
@@ -174,7 +187,7 @@ func _terrain() -> void:
 func _water() -> void:
 	var w := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(1400, 1400)
+	pm.size = Vector2(2400, 2400)
 	w.mesh = pm
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(0.12, 0.38, 0.52, 0.86)
@@ -293,7 +306,7 @@ func _pine_ridge(p: Dictionary) -> void:
 
 func _scatter() -> void:
 	# Trees, rocks and lone shacks between POIs.
-	for i in 140:
+	for i in 340:
 		var a := b.rng.randf() * TAU
 		var r := sqrt(b.rng.randf()) * (ISLAND_R - 20.0)
 		var x := cos(a) * r
@@ -307,16 +320,16 @@ func _scatter() -> void:
 			b.prop(SURV + ["rock-a.glb", "rock-b.glb", "rock-c.glb"][i % 3], Vector3(x, h - 0.3, z), b.rng.randf_range(5.0, 9.0), b.rng.randf_range(0, 360))
 		else:
 			b.tree(SURV + ["tree.glb", "tree-tall.glb", "tree-autumn.glb"][i % 3], Vector3(x, h, z), b.rng.randf_range(5.0, 7.0))
-	for i in 9:
-		var a2 := TAU * i / 9.0 + 0.3
-		var r2 := 115.0 + b.rng.randf_range(-15, 15)
+	for i in 16:
+		var a2 := TAU * i / 16.0 + 0.3
+		var r2 := (115.0 if i % 2 else 205.0) * (1.0 if i % 2 else 1.0) + b.rng.randf_range(-15, 15)
 		var x2 := cos(a2) * r2
 		var z2 := sin(a2) * r2
 		if _near_poi(x2, z2, 12.0) or height(x2, z2) < 1.5:
 			continue
 		var c := Vector3(x2, height(x2, z2), z2)
 		_add_house(c, Vector2(7, 6), ["s"], Color(0.7, 0.62, 0.5), b.rng.randf_range(0, 90), 3.0)
-	for i in 30:
+	for i in 70:
 		var a3 := b.rng.randf() * TAU
 		var r3 := sqrt(b.rng.randf()) * (ISLAND_R - 30.0)
 		var x3 := cos(a3) * r3
@@ -330,3 +343,131 @@ func _near_poi(x: float, z: float, pad: float) -> bool:
 		if Vector2(x, z).distance_to(p.pos) < p.r + pad:
 			return true
 	return false
+
+
+# ---------------- New POIs (expanded map) ----------------
+
+## Small physics props (explosive barrels, crates) as dynamic cover.
+func _phys(kind: String, pos: Vector3, yaw := 0.0) -> void:
+	PhysicsProp.spawn(self, kind, pos + Vector3.UP * 0.05, yaw)
+
+
+func _airfield(p: Dictionary) -> void:
+	var o := Vector3(p.pos.x, p.base, p.pos.y)
+	var tarmac := b.flat(Color(0.3, 0.3, 0.31))
+	var line := b.flat(Color(0.92, 0.9, 0.82))
+	# Runway (N-S) with centre markings
+	b.box(o + Vector3(-18, 0.06, 0), Vector3(14, 0.12, 104), tarmac, 0, null, false)
+	for i in 9:
+		b.box(o + Vector3(-18, 0.13, -44 + i * 11), Vector3(0.6, 0.02, 5), line, 0, null, false)
+	# Apron + two helipads
+	b.box(o + Vector3(10, 0.06, 0), Vector3(26, 0.12, 44), tarmac, 0, null, false)
+	for hz in [-12.0, 12.0]:
+		var pad := o + Vector3(12, 0.0, hz)
+		b.box(pad + Vector3(0, 0.14, 0), Vector3(10, 0.04, 10), b.flat(Color(0.18, 0.2, 0.18)), 0, null, false)
+		b.box(pad + Vector3(-1.4, 0.17, 0), Vector3(0.7, 0.02, 5), line, 0, null, false)
+		b.box(pad + Vector3(1.4, 0.17, 0), Vector3(0.7, 0.02, 5), line, 0, null, false)
+		b.box(pad + Vector3(0, 0.17, 0), Vector3(2.8, 0.02, 0.7), line, 0, null, false)
+		vehicle_points.append({"pos": pad + Vector3(0, 0.6, 0), "rot": PI * 0.5, "kind": "heli"})
+	# Hangars (big open sheds) and control tower
+	_add_house(o + Vector3(36, 0, -16), Vector2(16, 14), ["w", "e"], Color(0.55, 0.6, 0.58), 0.0, 6.0)
+	_add_house(o + Vector3(36, 0, 14), Vector2(16, 14), ["w", "n"], Color(0.6, 0.58, 0.52), 0.0, 6.0)
+	_add_house(o + Vector3(8, 0, -34), Vector2(9, 8), ["s", "e"], Color(0.75, 0.75, 0.72), 0.0, 3.6)
+	b.tower(o + Vector3(8, 0, 34), 6.0, 180)
+	loot_points.append(o + Vector3(8, 6.5, 34))
+	b.prop(TOON + "WaterTank_Platform.gltf", o + Vector3(30, 0, 36), 1.0, 0)
+	b.prop(TOON + "Structure_1.gltf", o + Vector3(-2, 0, 30), 0.8, 90)
+	for i in 5:
+		b.prop(TOON + "StreetLight.gltf", o + Vector3(-27, 0, -40 + i * 20), 0.6, 90, false)
+	for i in 4:
+		_phys("barrel", o + Vector3(24 + i * 1.2, 0.1, -2.0))
+		_phys("crate", o + Vector3(24, 0.1, 4 + i * 1.3), b.rng.randf() * TAU)
+	_phys("gas_tank", o + Vector3(44, 0.1, 0))
+	crate_points.append(o + Vector3(10, 0.2, 0))
+	for i in 8:
+		loot_points.append(o + Vector3(b.rng.randf_range(0, 44), 0.3, b.rng.randf_range(-30, 30)))
+
+
+func _military_base(p: Dictionary) -> void:
+	var o := Vector3(p.pos.x, p.base, p.pos.y)
+	var wall := b.painted(Color(0.5, 0.5, 0.42))
+	# Perimeter wall with gates on east and west
+	for side in [-1.0, 1.0]:
+		b.box(o + Vector3(0, 1.6, side * 30), Vector3(60, 3.2, 0.8), wall)
+		b.box(o + Vector3(side * 30, 1.6, -17), Vector3(0.8, 3.2, 26), wall)
+		b.box(o + Vector3(side * 30, 1.6, 17), Vector3(0.8, 3.2, 26), wall)
+	# Barracks + HQ
+	for i in 3:
+		_add_house(o + Vector3(-16 + i * 16, 0, -18), Vector2(11, 7), ["s"], Color(0.42, 0.47, 0.36), 0.0, 3.4)
+	_add_house(o + Vector3(10, 0, 14), Vector2(14, 10), ["n", "w"], Color(0.6, 0.58, 0.5), 0.0, 4.6)
+	# Watchtowers at the corners
+	b.tower(o + Vector3(-26, 0, -26), 5.0, 45)
+	b.tower(o + Vector3(26, 0, 26), 5.0, -135)
+	loot_points.append(o + Vector3(-26, 5.5, -26))
+	loot_points.append(o + Vector3(26, 5.5, 26))
+	# Sandbag trenches, barriers, parked tank, helipad
+	for c in [[Vector3(-8, 0, 2), 0.0], [Vector3(4, 0, -4), 90.0], [Vector3(-20, 0, 10), 30.0], [Vector3(20, 0, -6), -30.0]]:
+		b.prop(TOON + "SackTrench.gltf", o + c[0], 0.55, c[1])
+	for i in 3:
+		b.prop(TOON + "Barrier_Large.gltf", o + Vector3(-27, 0, -6 + i * 6), 0.35, 90)
+	b.prop(TOON + "Debris_BrokenCar.gltf", o + Vector3(-14, 0, 22), 1.3, 70)
+	b.box(o + Vector3(-12, 0.08, 14), Vector3(10, 0.06, 10), b.flat(Color(0.2, 0.22, 0.2)), 0, null, false)
+	vehicle_points.append({"pos": o + Vector3(-12, 0.6, 14), "rot": 0.0, "kind": "heli"})
+	for i in 3:
+		_phys("barrel", o + Vector3(14 + i * 1.3, 0.1, -6))
+		_phys("boxes", o + Vector3(-4 + i * 2.5, 0.1, 24), b.rng.randf() * TAU)
+	_phys("gas_tank", o + Vector3(24, 0.1, 6))
+	crate_points.append(o + Vector3(0, 0.2, 4))
+	for i in 7:
+		loot_points.append(o + Vector3(b.rng.randf_range(-24, 24), 0.3, b.rng.randf_range(-24, 24)))
+
+
+func _fishing_village(p: Dictionary) -> void:
+	var o := Vector3(p.pos.x, p.base, p.pos.y)
+	var cols := [Color(0.85, 0.55, 0.45), Color(0.45, 0.65, 0.78), Color(0.9, 0.85, 0.6), Color(0.6, 0.78, 0.6)]
+	for i in 6:
+		var a := -0.9 + i * 0.36
+		_add_house(o + Vector3(sin(a) * 18, 0, -cos(a) * 12), Vector2(7, 6), ["s" if i % 2 else "e"], cols[i % 4], rad_to_deg(-a), 3.0)
+	# Wooden pier out into the sea (south)
+	var wood := b.painted(Color(0.5, 0.38, 0.26))
+	b.box(o + Vector3(0, 0.4, 26), Vector3(4, 0.3, 30), wood)
+	b.box(o + Vector3(6, 0.4, 38), Vector3(12, 0.3, 4), wood)
+	for i in 3:
+		b.prop(TOON + "Pallet.gltf", o + Vector3(-1, 0.55, 18 + i * 6), 0.12, 0, true)
+	for i in 3:
+		_phys("crate", o + Vector3(1, 0.7, 20 + i * 5), b.rng.randf() * TAU)
+	_phys("barrel", o + Vector3(8, 0.7, 38))
+	crate_points.append(o + Vector3(0, 0.2, 0))
+	for i in 6:
+		loot_points.append(o + Vector3(b.rng.randf_range(-18, 18), 0.3, b.rng.randf_range(-10, 8)))
+
+
+## Dirt roads linking neighbouring POIs (visual only, laid on the terrain).
+func _roads() -> void:
+	var road := b.flat(Color(0.48, 0.42, 0.32))
+	var links := [[4, 0], [4, 1], [4, 2], [4, 3], [4, 6], [4, 7], [4, 8], [0, 8], [1, 6], [2, 7], [3, 6], [5, 2], [0, 7]]
+	for l in links:
+		var a: Vector2 = poi_defs[l[0]].pos
+		var c: Vector2 = poi_defs[l[1]].pos
+		var steps := int(a.distance_to(c) / 8.0)
+		for i in steps:
+			var t0 := float(i) / steps
+			var t1 := float(i + 1) / steps
+			var p0 := a.lerp(c, t0)
+			var p1 := a.lerp(c, t1)
+			var mid := (p0 + p1) * 0.5
+			if _near_poi(mid.x, mid.y, -6.0) or height(mid.x, mid.y) < 1.0:
+				continue
+			var h0 := height(p0.x, p0.y)
+			var h1 := height(p1.x, p1.y)
+			var seg := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			var len3 := Vector3(p1.x - p0.x, h1 - h0, p1.y - p0.y).length()
+			bm.size = Vector3(4.5, 0.1, len3 + 0.6)
+			seg.mesh = bm
+			seg.material_override = road
+			seg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(seg)
+			var from := Vector3(p0.x, h0 + 0.12, p0.y)
+			var to := Vector3(p1.x, h1 + 0.12, p1.y)
+			seg.look_at_from_position((from + to) * 0.5, to, Vector3.UP)

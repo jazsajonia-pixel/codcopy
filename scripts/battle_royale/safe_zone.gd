@@ -5,6 +5,7 @@ extends RefCounted
 signal phase_changed(index: int, shrinking: bool)
 
 const DEFAULT_PHASES := [
+	{"wait": 40.0, "shrink": 35.0, "radius": 190.0, "dps": 1.5},
 	{"wait": 50.0, "shrink": 30.0, "radius": 115.0, "dps": 2.0},
 	{"wait": 40.0, "shrink": 25.0, "radius": 72.0, "dps": 4.0},
 	{"wait": 30.0, "shrink": 22.0, "radius": 40.0, "dps": 7.0},

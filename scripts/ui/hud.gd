@@ -83,7 +83,7 @@ func _build_top() -> void:
 	minimap = Minimap.new()
 	minimap.match_node = match_node
 	minimap.player = player
-	minimap.radius_m = 120.0 if MatchConfig.mode == "br" else 45.0
+	minimap.radius_m = 160.0 if MatchConfig.mode == "br" else 45.0
 	root.add_child(minimap)
 	score_box = HBoxContainer.new()
 	score_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -460,10 +460,10 @@ func _on_bag_closed() -> void:
 
 
 func _on_vehicle_changed(v: Vehicle) -> void:
-	touch.set_driving(v != null)
+	touch.set_driving(v != null, v is Helicopter and player.vehicle_seat == 0)
 	overlay.visible = v == null
 	if v:
-		interact_label.text = ("Driving " if player.vehicle_seat == 0 else "Riding ") + v.display_name() + ("" if player.touch_mode else "   [F] exit   [Space] handbrake")
+		interact_label.text = ("Driving " if player.vehicle_seat == 0 else "Riding ") + v.display_name() + ("" if player.touch_mode else ("   [F] exit   [Space] climb   [C] descend" if v is Helicopter else "   [F] exit   [Space] handbrake"))
 	else:
 		interact_label.text = ""
 
@@ -547,6 +547,8 @@ func _process(delta: float) -> void:
 	if player.vehicle and is_instance_valid(player.vehicle):
 		var v := player.vehicle
 		equip_label.text = "%s  %d%%   %d km/h" % [v.display_name(), roundi(100.0 * v.health / v.max_health), roundi(v.speed() * 3.6)]
+		if v is Helicopter:
+			equip_label.text += "   ALT %d m   ROTOR %d%%" % [roundi((v as Helicopter).altitude()), roundi((v as Helicopter).rpm * 100.0)]
 	drop_label.visible = player.parachute_state > 0
 	if drop_label.visible:
 		var spd := roundi(player.velocity.length() * 3.6)

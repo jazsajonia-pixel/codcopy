@@ -5,7 +5,7 @@ extends MatchBase
 enum Phase { BOARDING, PLANE, ACTIVE, OVER }
 
 const PLANE_HEIGHT := 240.0   ## higher drop = longer wingsuit glide
-const PLANE_SPEED := 13.0
+const PLANE_SPEED := 19.0
 
 var phase := Phase.BOARDING
 var boarding := 6.0
@@ -64,7 +64,7 @@ func _ready() -> void:
 	_build_zone()
 	_build_plane()
 	zone.land_check = func(p: Vector2): return _isla.height(p.x, p.y) > 1.0
-	zone.setup(Vector2.ZERO, 190.0, time_scale, rng.randi())
+	zone.setup(Vector2.ZERO, 300.0, time_scale, rng.randi())
 	zone.phase_changed.connect(_on_zone_phase)
 	player.allow_input = false
 	var fdir := plane_to - plane_from
@@ -85,7 +85,7 @@ var vehicles: Array = []
 
 func _spawn_vehicles() -> void:
 	for vp in map.vehicle_points:
-		var v := Vehicle.new()
+		var v: Vehicle = Helicopter.new() if vp.kind == "heli" else Vehicle.new()
 		v.setup(vp.kind)
 		add_child(v)
 		v.global_transform = Transform3D(Basis(Vector3.UP, vp.rot), vp.pos)
@@ -191,7 +191,7 @@ func _build_plane() -> void:
 		plane.add_child(mi)
 	add_child(plane)
 	var a := rng.randf() * TAU
-	plane_from = Vector3(cos(a) * 210.0, PLANE_HEIGHT, sin(a) * 210.0)
+	plane_from = Vector3(cos(a) * 340.0, PLANE_HEIGHT, sin(a) * 340.0)
 	var off := rng.randf_range(-60, 60)
 	var perp := Vector3(-sin(a), 0, cos(a)) * off
 	plane_to = -plane_from + perp * 2.0

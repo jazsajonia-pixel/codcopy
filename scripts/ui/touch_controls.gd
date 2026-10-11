@@ -38,6 +38,7 @@ const MOUSE_FINGER := 99
 var player: Player
 var edit_mode := false
 var br_mode := false
+var flying := false          ## piloting a helicopter: JUMP = climb, CROUCH = descend
 var driving := false         ## in a vehicle: only movement, look, EXIT, BRAKE, pause, scoreboard
 var layout := {}
 var selected := ""
@@ -114,16 +115,18 @@ func _button_active(id: String) -> bool:
 	if DEFAULTS[id].get("br_only", false) and not br_mode and not edit_mode:
 		return false
 	if driving and not edit_mode:
-		return id in ["interact", "jump", "pause", "score"]
+		return id in ["interact", "jump", "pause", "score"] or (flying and id == "crouch")
 	if id == "interact" and not _interact_available and not edit_mode and not driving:
 		return false
 	return true
 
 
-func set_driving(v: bool) -> void:
+func set_driving(v: bool, heli: bool = false) -> void:
 	driving = v
+	flying = v and heli
 	layout.interact.label = "EXIT" if v else "PICK"
-	layout.jump.label = "BRAKE" if v else "JUMP"
+	layout.jump.label = ("UP" if heli else "BRAKE") if v else "JUMP"
+	layout.crouch.label = "DOWN" if flying else "CROUCH"
 	release_all()
 	queue_redraw()
 

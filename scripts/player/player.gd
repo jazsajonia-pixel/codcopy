@@ -265,16 +265,24 @@ func _ride(delta: float) -> void:
 	if not is_instance_valid(v):
 		vehicle = null
 		return
-	if vehicle_seat == 0:
-		var brake_held := Input.is_action_pressed("jump")
-		var tc = get_meta("touch_controls", null)
-		if touch_mode and tc and is_instance_valid(tc):
-			brake_held = tc.is_held("jump")
-		v.drive(input.move, brake_held)
 	var lk := input.look
 	if SaveManager.get_setting("controls", "invert_y", false):
 		lk.y = -lk.y
 	v.update_camera(delta, lk)
+	if vehicle_seat == 0:
+		var brake_held := Input.is_action_pressed("jump")
+		var down_held := Input.is_action_pressed("crouch")
+		var tc = get_meta("touch_controls", null)
+		if touch_mode and tc and is_instance_valid(tc):
+			brake_held = tc.is_held("jump")
+			down_held = tc.is_held("crouch")
+		if MatchConfig.autoplay_player:
+			brake_held = false
+		if v is Helicopter:
+			var f := -v.chase_cam.global_transform.basis.z
+			(v as Helicopter).fly(input.move, brake_held, down_held, atan2(-f.x, -f.z))
+		else:
+			v.drive(input.move, brake_held)
 	if input.interact:
 		v.exit(self)
 

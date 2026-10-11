@@ -35,6 +35,8 @@ var _last_attacker: Actor = null
 var _smoke: GPUParticles3D
 var _hit_cooldown := {}      ## Actor -> time left before another run-over hit
 var bumper: Area3D
+var cam_dist := 7.5
+var cam_height := 1.9
 
 
 func setup(p_kind: String) -> void:
@@ -370,7 +372,12 @@ func _explode() -> void:
 	for w in wheels:
 		(w as VehicleWheel3D).visible = false
 	apply_central_impulse(Vector3.UP * mass * 4.0)
+	_on_destroyed_fx()
 	destroyed.emit(self)
+
+
+func _on_destroyed_fx() -> void:
+	Effects.burst("chunks", global_position + Vector3.UP, Vector3.UP, 1.5)
 
 
 # ---------------- Camera ----------------
@@ -384,9 +391,9 @@ func update_camera(delta: float, look: Vector2) -> void:
 		cam_yaw = lerp_angle(cam_yaw, 0.0, clampf(delta * 1.2, 0, 1))
 	var heading := atan2(global_transform.basis.z.x, global_transform.basis.z.z)
 	var yaw := heading + cam_yaw + PI
-	var dist := 7.5
+	var dist := cam_dist
 	var off := Vector3(sin(yaw) * cos(cam_pitch), -sin(cam_pitch), cos(yaw) * cos(cam_pitch)) * dist
-	var pivot := global_position + Vector3.UP * 1.9
+	var pivot := global_position + Vector3.UP * cam_height
 	var want := pivot + off
 	var q := PhysicsRayQueryParameters3D.create(pivot, want, 1, [get_rid()])
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
