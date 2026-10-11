@@ -139,5 +139,6 @@ func _run() -> void:
 
 
 func _done() -> void:
+	check(ErrorLog.errors.is_empty(), "no runtime errors shown on screen %s" % [ErrorLog.errors])
 	print("=== RESULT phone: %d passed, %d failed ===" % [passed, failed])
 	get_tree().quit(0 if failed == 0 else 1)

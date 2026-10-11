@@ -41,6 +41,8 @@ func spawn_player(team: int) -> Player:
 	add_child(player)
 	_register(player)
 	hud = HUD_SCENE.instantiate()
+	if hud.get_script() == null:
+		push_error("HUD script failed to load (scripts/ui/hud.gd) - no HUD or touch controls. Reopen the project so Godot re-imports it.")
 	hud.match_node = self
 	hud.player = player
 	add_child(hud)

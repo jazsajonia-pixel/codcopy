@@ -42,10 +42,14 @@ when the device reports a touchscreen and then switches live: touching the scree
 pressing a keyboard key or gamepad button switches to keyboard/mouse (click the game window to lock the mouse for
 aiming).
 
-**If you can't move:** make sure you've pulled the latest `main` (the "no HUD / can't move" loading bug was fixed in
-commit `d4019a5`), click inside the game window so it has keyboard focus, and in Battle Royale press Space / JUMP to
-leave the aircraft first; you can't walk until you land. You can also set Control scheme to Keyboard/Mouse or Touch
-explicitly.
+**If you can't move / there are no on-screen controls:**
+1. Check the build shown on the main menu's HOME page (e.g. `Build 0.5.1 (2026-10-11)`). If it is older or missing,
+   your copy is out of date. In the **Godot Android editor**: download the repo again (GitHub > Code > Download ZIP),
+   extract it, import/open that folder in the Project Manager, let it finish importing, then press Play.
+2. If something fails at runtime, a red **ERRORS** box appears in the top-left with the message and script line
+   (Godot 4.5+). Take a screenshot of it; tap it to hide it.
+3. On phones/tablets touching the screen always brings up the on-screen controls. On a PC, click inside the game
+   window so it has keyboard focus. In Battle Royale press JUMP / Space to leave the aircraft first.
 
 ### Touch (default on touchscreen devices)
 - **Left side**: floating movement joystick. Push fully forward to auto-sprint; drag past the top to lock sprint.

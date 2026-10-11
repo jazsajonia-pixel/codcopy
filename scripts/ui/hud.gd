@@ -193,7 +193,7 @@ func _build_touch() -> void:
 	touch.on_score = func(show: bool): scoreboard_panel.visible = show
 	root.add_child(touch)
 	var scheme: String = SaveManager.get_setting("controls", "scheme", "auto")
-	var use_touch := scheme == "touch" or (scheme == "auto" and (DisplayServer.is_touchscreen_available() or OS.has_feature("mobile")))
+	var use_touch := scheme == "touch" or (scheme != "keyboard" and (DisplayServer.is_touchscreen_available() or is_mobile()))
 	touch.visible = use_touch
 	player.touch_mode = use_touch
 	if not use_touch and not MatchConfig.autoplay_player and DisplayServer.get_name() != "headless":
@@ -215,6 +215,7 @@ func _build_pause() -> void:
 	v.add_theme_constant_override("separation", 12)
 	p.add_child(v)
 	v.add_child(UITheme.label("PAUSED", 34, UITheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UITheme.label("Build %s" % ErrorLog.BUILD, 13, UITheme.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(UITheme.button("Resume", func(): match_node.toggle_pause(), Vector2(380, 64)))
 	v.add_child(UITheme.button("Restart Match", func(): MatchConfig.start_match(), Vector2(380, 64)))
 	# Quick sensitivity tweak without leaving the match.
@@ -344,8 +345,9 @@ func show_pause(p: bool) -> void:
 func _input(event: InputEvent) -> void:
 	# Safety net: a real finger touch while in keyboard mode switches to on-screen controls (unless the
 	# player explicitly chose Keyboard/Mouse). Covers devices that don't report a touchscreen up front.
+	# On phones/tablets a real touch always brings the on-screen controls back, even if Keyboard/Mouse was chosen.
 	if event is InputEventScreenTouch and event.pressed and player and not player.touch_mode \
-			and SaveManager.get_setting("controls", "scheme", "auto") != "keyboard":
+			and (is_mobile() or SaveManager.get_setting("controls", "scheme", "auto") != "keyboard"):
 		player.touch_mode = true
 		touch.visible = not get_tree().paused
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -358,6 +360,14 @@ func _input(event: InputEvent) -> void:
 			and ((event is InputEventKey and event.pressed and not event.echo and _is_game_key(event)) \
 				or (event is InputEventJoypadButton and event.pressed)):
 		set_keyboard_mode()
+
+
+## Android / iOS (native, or the Godot Android editor running the game, or a mobile browser).
+static func is_mobile() -> bool:
+	for f in ["android", "ios", "mobile", "web_android", "web_ios"]:
+		if OS.has_feature(f):
+			return true
+	return OS.get_name() in ["Android", "iOS"]
 
 
 ## True only for keys bound to gameplay actions (WASD, Space, R, ...). Android system keys such as

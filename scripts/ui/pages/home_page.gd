@@ -11,7 +11,7 @@ func _ready() -> void:
 	left.add_theme_constant_override("separation", 14)
 	add_child(left)
 	left.add_child(UITheme.label("READY UP", 34, UITheme.ACCENT))
-	left.add_child(_card("MULTIPLAYER", "Team Deathmatch and Free-For-All against AI opponents.", func(): menu.show_page("mp")))
+	left.add_child(_card("MULTIPLAYER", "Team Deathmatch, Domination and Free-For-All against AI opponents.", func(): menu.show_page("mp")))
 	left.add_child(_card("BATTLE ROYALE", "Drop onto Isla Verde, loot, and outlast the zone.", func(): menu.show_page("br")))
 	var row := HBoxContainer.new()
 	row.add_child(UITheme.button("LOADOUT", func(): menu.show_page("loadout"), Vector2(200, 60)))
@@ -21,7 +21,8 @@ func _ready() -> void:
 	var p := SaveManager.profile
 	var kd := float(p.kills) / maxf(float(p.deaths), 1.0)
 	left.add_child(UITheme.label("Matches %d   Wins %d   Kills %d   K/D %.2f" % [p.matches, p.wins, p.kills, kd], 18, UITheme.MUTED))
-	left.add_child(UITheme.label("Offline mode: every opponent and teammate is an AI bot.", 16, UITheme.MUTED))
+	left.add_child(UITheme.label("Offline mode: every opponent and teammate is an AI bot. LAN play: Online (LAN).", 16, UITheme.MUTED))
+	left.add_child(UITheme.label("Build %s  |  Godot %s" % [ErrorLog.BUILD, Engine.get_version_info().string], 13, UITheme.MUTED))
 	var right := VBoxContainer.new()
 	right.custom_minimum_size = Vector2(340, 0)
 	add_child(right)
