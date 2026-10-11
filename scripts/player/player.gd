@@ -213,11 +213,24 @@ func _ads_sens_mult() -> float:
 
 
 ## Touch HUD calls this with a raw drag delta in pixels.
+var _look_filtered := Vector2.ZERO
+
+
+## Touch camera: sensitivity x ADS/optic multiplier, separate vertical speed, an aim-acceleration
+## curve (slow drags precise, fast flicks turn further), light jitter smoothing and aim-assist friction.
 func touch_look(delta_px: Vector2) -> void:
 	var sens := 0.16 * float(SaveManager.get_setting("controls", "look_sensitivity", 1.0)) * _ads_sens_mult()
 	if aim_assist_target != null:
 		sens *= 0.6   # aim-assist friction
-	input.look += delta_px * sens
+	var accel := float(SaveManager.get_setting("controls", "look_accel", 0.35))
+	var spd := delta_px.length()
+	var gain := 1.0 + accel * clampf((spd - 6.0) / 34.0, 0.0, 1.0) * 1.2
+	var smooth := clampf(float(SaveManager.get_setting("controls", "look_smoothing", 0.25)), 0.0, 0.9)
+	_look_filtered = _look_filtered.lerp(delta_px, 1.0 - smooth) if smooth > 0.0 else delta_px
+	# Exponential filter on per-event motion (removes jitter; remainder carries into the next event).
+	var d := _look_filtered if spd > 0.0 else delta_px
+	d.y *= float(SaveManager.get_setting("controls", "look_vertical", 0.85))
+	input.look += d * sens * gain
 
 
 # ---------------- Main loop ----------------

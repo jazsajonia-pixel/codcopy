@@ -151,6 +151,10 @@ func _controls_tab() -> void:
 func _sens_tab() -> void:
 	var v := _page("Sensitivity")
 	_slider(v, "controls", "look_sensitivity", "Camera (touch/gamepad)", 0.2, 3.0, 0.05)
+	_slider(v, "controls", "look_vertical", "Vertical look speed", 0.4, 1.5, 0.05, "Relative to horizontal camera speed.")
+	_slider(v, "controls", "look_accel", "Aim acceleration", 0.0, 1.0, 0.05, "Fast swipes turn further; slow drags stay precise.")
+	_slider(v, "controls", "look_smoothing", "Look smoothing", 0.0, 0.8, 0.05, "Filters finger jitter. Higher = smoother, slightly less direct.")
+	_slider(v, "controls", "stick_deadzone", "Joystick deadzone", 0.0, 0.4, 0.01)
 	_slider(v, "controls", "mouse_sensitivity", "Mouse", 0.2, 3.0, 0.05)
 	_slider(v, "controls", "ads_sensitivity", "ADS multiplier", 0.2, 1.5, 0.05, "Applied while aiming with iron sights and any optic.")
 	_slider(v, "controls", "optic_red_dot", "Red dot", 0.3, 1.5, 0.05, "Multiplier on top of ADS")

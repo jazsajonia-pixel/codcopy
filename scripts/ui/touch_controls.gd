@@ -228,10 +228,17 @@ func _touch_drag(idx: int, p: Vector2, rel: Vector2) -> void:
 		"joy":
 			var r := _radius("joystick")
 			var v := (p - _joy_center) / r
+			# Floating base follows the finger past the edge (not upward, so sprint lock still works).
+			if SaveManager.get_setting("controls", "stick_follow", true) and v.length() > 1.5 and v.y > -0.9:
+				_joy_center += (p - _joy_center).normalized() * (v.length() - 1.5) * r
+				v = (p - _joy_center) / r
 			# Dragging well above the stick engages sprint lock.
 			if player:
 				player.input.touch_sprint = v.y < -1.35 or (SaveManager.get_setting("controls", "sprint_mode", "auto") == "auto" and v.y < -0.92 and absf(v.x) < 0.5)
-			_joy_vec = v.limit_length(1.0)
+			# Deadzone with rescale so small thumb movements still give fine control past it.
+			var dz := float(SaveManager.get_setting("controls", "stick_deadzone", 0.12))
+			var lv := minf(v.length(), 1.0)
+			_joy_vec = Vector2.ZERO if lv <= dz else v.normalized() * ((lv - dz) / maxf(1.0 - dz, 0.01))
 			if player:
 				player.input.move = _joy_vec
 			queue_redraw()

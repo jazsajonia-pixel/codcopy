@@ -22,6 +22,11 @@ const DEFAULT_SETTINGS := {
 	"controls": {
 		"scheme": "auto",            # auto | touch | keyboard
 		"look_sensitivity": 1.0,
+		"look_vertical": 0.85,       # vertical look speed relative to horizontal
+		"look_accel": 0.35,          # touch aim acceleration: fast swipes turn further (0 = linear)
+		"look_smoothing": 0.25,      # filters touch jitter (0 = raw)
+		"stick_deadzone": 0.12,      # movement joystick deadzone (rescaled outside it)
+		"stick_follow": true,        # joystick base follows the finger when dragged past its edge
 		"ads_sensitivity": 0.7,
 		"optic_red_dot": 1.0,       # multiplier applied on top of ADS sensitivity
 		"optic_holo": 0.95,
