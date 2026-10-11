@@ -72,6 +72,11 @@ func _ready() -> void:
 	arms.set_skin(SaveManager.get_setting("graphics", "arm_skin", "pale") == "dark")
 
 
+var gun_box := AABB()   ## gun-local bounds (used to keep the stock / rear sight out of the eye at ADS)
+const ADS_EYE_RELIEF := 0.2     ## min distance from the eye to the sight (m)
+const ADS_REAR_CLEAR := 0.07    ## the rear of the gun stays at least this far in front of the eye
+
+
 func set_weapon(w: WeaponInstance) -> void:
 	weapon = w
 	if gun:
@@ -112,6 +117,9 @@ func set_weapon(w: WeaponInstance) -> void:
 		if bolt_bone >= 0: bolt_rest = skeleton.get_bone_pose_position(bolt_bone)
 		if slide_bone >= 0: slide_rest = skeleton.get_bone_pose_position(slide_bone)
 	_find_hand_points()
+	var acc := [null]
+	ActorModel._visible_aabb(gun, Transform3D.IDENTITY, acc)
+	gun_box = acc[0] if acc[0] != null else AABB(Vector3(-0.03, -0.05, -0.4), Vector3(0.06, 0.1, 0.6))
 	gun.add_child(flash)
 	flash.position = muzzle_local + Vector3(0, 0, -0.06)
 	_build_attachments()
@@ -157,12 +165,48 @@ func _box(size: Vector3, color: Color, emissive := false) -> MeshInstance3D:
 func _build_attachments() -> void:
 	var optic: String = weapon.stats.get("optic", "iron")
 	if optic in ["red_dot", "holo"]:
-		var housing := _box(Vector3(0.035, 0.035, 0.05), Color(0.1, 0.1, 0.1))
-		housing.position = scope_local + Vector3(0, 0.02, 0)
-		gun.add_child(housing)
-		var dot := _box(Vector3(0.004, 0.004, 0.001), Color(1, 0.1, 0.1) if optic == "red_dot" else Color(0.2, 1, 0.4), true)
-		dot.position = scope_local + Vector3(0, 0.022, -0.026)
+		# Open reflex sight: a thin frame around a clear, lightly tinted window (no solid box in front of the eye).
+		var c := scope_local + Vector3(0, 0.022, -0.02)
+		var dark := Color(0.09, 0.09, 0.1)
+		var w := 0.034 if optic == "red_dot" else 0.044
+		var h := 0.03 if optic == "red_dot" else 0.032
+		var t := 0.0035
+		var base := _box(Vector3(w * 0.7, 0.008, 0.05), dark)
+		base.position = scope_local + Vector3(0, 0.004, -0.01)
+		gun.add_child(base)
+		for side in [-1.0, 1.0]:
+			var post := _box(Vector3(t, h, 0.012), dark)
+			post.position = c + Vector3(side * (w * 0.5), 0, 0)
+			gun.add_child(post)
+		var top := _box(Vector3(w + t, t, 0.012), dark)
+		top.position = c + Vector3(0, h * 0.5, 0)
+		gun.add_child(top)
+		var bottom := _box(Vector3(w + t, t, 0.012), dark)
+		bottom.position = c + Vector3(0, -h * 0.5, 0)
+		gun.add_child(bottom)
+		var glass := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(w, h)
+		glass.mesh = q
+		var gm := StandardMaterial3D.new()
+		gm.albedo_color = Color(0.55, 0.8, 0.9, 0.12) if optic == "red_dot" else Color(0.7, 0.9, 0.6, 0.1)
+		gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		gm.cull_mode = BaseMaterial3D.CULL_DISABLED
+		glass.material_override = gm
+		glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		glass.position = c
+		gun.add_child(glass)
+		var col := Color(1, 0.12, 0.1) if optic == "red_dot" else Color(0.25, 1, 0.45)
+		var dot := _box(Vector3(0.0022, 0.0022, 0.0005), col, true)
+		dot.position = c + Vector3(0, 0, -0.001)
 		gun.add_child(dot)
+		if optic == "holo":
+			# Holographic ring reticle (4 short segments around the dot)
+			for i in 4:
+				var seg := _box(Vector3(0.007 if i < 2 else 0.0012, 0.0012 if i < 2 else 0.007, 0.0005), col, true)
+				seg.position = c + Vector3(0, (0.008 if i == 0 else -0.008) if i < 2 else 0.0, -0.001) + Vector3(((0.008 if i == 2 else -0.008) if i >= 2 else 0.0), 0, 0)
+				gun.add_child(seg)
 	elif optic in ["4x", "8x"]:
 		var tube := MeshInstance3D.new()
 		var c := CylinderMesh.new()
@@ -296,7 +340,23 @@ func animate(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, 
 	var hip: Vector3 = weapon.data.view_offset
 	var aim: Vector3 = weapon.data.ads_offset
 	if weapon.data.category != "LAUNCHER":   # launchers aim off-axis from the shoulder
-		aim.y = -scope_local.y - (0.022 if weapon.stats.get("optic", "iron") != "iron" else 0.006)
+		var optic: String = weapon.stats.get("optic", "iron")
+		aim.y = -scope_local.y - (0.022 if optic != "iron" else 0.006)
+		var eye_above_gun := false
+		if optic == "iron" and weapon.data.category == "SHOTGUN":
+			# Shotguns sight down the top rib: keep the eye just above the highest point of the gun,
+			# so the stock passes under the eye (seen edge-on) instead of filling the screen.
+			aim.y = -maxf(scope_local.y, gun_box.end.y) - 0.016
+			eye_above_gun = true
+		aim.x = -scope_local.x
+		# Eye relief: never let the stock, rear sight or optic housing sit right in front of the camera
+		# (that used to black out the iron-sight / red-dot view). Magnified optics are drawn by the HUD.
+		if not optic in ["3x", "4x", "8x"]:
+			var rear_z := gun_box.end.z
+			# Only the part of the gun that rises above the sight line can block the view.
+			if gun_box.end.y < scope_local.y - 0.01 and not eye_above_gun:
+				rear_z = scope_local.z
+			aim.z = minf(aim.z, minf(-ADS_REAR_CLEAR - rear_z, -ADS_EYE_RELIEF - scope_local.z))
 	var base := hip.lerp(aim, ads)
 	var pos := base + bob + Vector3(-sway.x, sway.y, kick)
 	var rot := Vector3(deg_to_rad(kick_rot), 0, 0)

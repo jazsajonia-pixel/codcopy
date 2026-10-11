@@ -40,6 +40,9 @@ func _ready() -> void:
 		"over":
 			MatchConfig.configure_mp(parts[2] if parts.size() > 2 else "tdm", parts[1])
 			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
+		"sights":
+			MatchConfig.configure_mp("tdm", "outpost")
+			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
 		"medal":
 			MatchConfig.configure_mp("tdm", "dockyard")
 			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
@@ -154,6 +157,41 @@ func _s_heli(m, p: Player) -> void:
 			print("HELI alt=", heli_ref.altitude(), " speed=", heli_ref.linear_velocity.length(), " hp=", heli_ref.health)
 			snap("heli_flying")
 			get_tree().quit()
+
+
+## ADS through every non-magnified sight: sights[:id,id...] (weapon/optic pairs).
+var sight_jobs := [["ar_m4k", ""], ["ar_m4k", "red_dot"], ["ar_m4k", "holo"], ["smg_vx", ""], ["pistol_p9", ""], ["sg_breacher", ""], ["ar_k47", "red_dot"], ["dmr_skr", ""], ["lmg_rpv", ""], ["smg_hornet", "holo"]]
+var sight_i := 0
+func _s_sights(m, p: Player) -> void:
+	if step == 0 and OS.get_environment("QA_SIGHTS") != "" and sight_i == 0 and t < 0.1:
+		sight_jobs = []
+		for j in OS.get_environment("QA_SIGHTS").split(","):
+			sight_jobs.append([j.get_slice(":", 0), j.get_slice(":", 1)])
+	if step == 0:
+		if t > 4.0 and p.is_on_floor():
+			step = 1
+		return
+	if step == 1:
+		var j: Array = sight_jobs[sight_i]
+		var att := {} if j[1] == "" else {"optic": j[1]}
+		p.inv.set_weapon(0, WeaponInstance.create(j[0], att, "default", true))
+		p.inv.current = 1
+		p.inv.switch_to(0)
+		p.ads_on = false
+		p.pitch = -0.02
+		st = t
+		step = 2
+	elif step == 2 and t - st > 0.9:
+		p.ads_on = true
+		st = t
+		step = 3
+	elif step == 3 and t - st > 1.0:
+		var j2: Array = sight_jobs[sight_i]
+		snap("sight_%s_%s" % [j2[0], j2[1] if j2[1] != "" else "iron"])
+		sight_i += 1
+		if sight_i >= sight_jobs.size():
+			get_tree().quit()
+		step = 1
 
 
 func _s_scope(m, p: Player) -> void:

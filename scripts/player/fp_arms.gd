@@ -6,6 +6,8 @@ extends Node3D
 ##  - per-finger curl gives a grip / fist / open-hand pose,
 ##  - the shoulder slides toward the target when it is out of reach, so hands never detach from the gun.
 ## The asset ships rigged but without animations; every motion here is generated in code.
+## Look: blocky, Roblox-style arms - the skinned mesh is hidden and square sleeve blocks plus cube hands
+## ride on the same IK-driven bones, so every pose / reload / inspect animation still works.
 
 const MODEL := "res://assets/arms/arms.glb"
 const SCALE := 0.1
@@ -17,6 +19,8 @@ var sides := {}            ## "r"/"l" -> {shoulder, bicep, forearm, wrist, l1, l
 var targets := {}          ## side -> {pos: Vector3 (ArmsRig local space), basis: Basis, curl: float, weight: float}
 var _smoothed := {}        ## side -> Transform3D actually used (smooth transitions between targets)
 var sleeve_material: StandardMaterial3D
+var hand_material: StandardMaterial3D
+var cuff_material: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -29,6 +33,7 @@ func _ready() -> void:
 	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Never cull the arms when bones move them away from the bind-pose bounds.
 	mesh.extra_cull_margin = 16.0
+	mesh.visible = false   # replaced by block arms (see _build_sleeves)
 	for s in ["r", "l"]:
 		var d := {
 			"shoulder": skel.find_bone("shoulder." + s),
@@ -52,35 +57,37 @@ func _ready() -> void:
 	_build_sleeves()
 
 
-## Uniform sleeves (original, procedural) attached to the arm bones so the arms read as a soldier's.
+## Block arms: a square sleeve on the upper and lower arm, a darker cuff and a cube hand per side.
 func _build_sleeves() -> void:
 	sleeve_material = StandardMaterial3D.new()
 	sleeve_material.albedo_color = Color(0.29, 0.33, 0.22)
-	sleeve_material.roughness = 0.95
-	var cuff := StandardMaterial3D.new()
-	cuff.albedo_color = Color(0.16, 0.17, 0.13)
+	sleeve_material.roughness = 0.9
+	cuff_material = StandardMaterial3D.new()
+	cuff_material.albedo_color = Color(0.16, 0.17, 0.13)
+	hand_material = StandardMaterial3D.new()
+	hand_material.albedo_color = Color(0.98, 0.8, 0.62)
+	hand_material.roughness = 0.75
 	for s in ["r", "l"]:
 		var d: Dictionary = sides[s]
-		_sleeve(skel.get_bone_name(d.bicep), d.l1 * 1.08, 0.66, 0.6, sleeve_material, -0.12)
-		_sleeve(skel.get_bone_name(d.forearm), d.l2 * 0.64, 0.6, 0.5, sleeve_material, -0.05)
-		_sleeve(skel.get_bone_name(d.forearm), d.l2 * 0.09, 0.53, 0.53, cuff, d.l2 * 0.56)
+		_block(skel.get_bone_name(d.bicep), Vector3(0.92, d.l1 * 1.1, 0.92), sleeve_material, -0.12)
+		_block(skel.get_bone_name(d.forearm), Vector3(0.86, d.l2 * 0.84, 0.86), sleeve_material, -0.05)
+		_block(skel.get_bone_name(d.forearm), Vector3(0.94, d.l2 * 0.12, 0.94), cuff_material, d.l2 * 0.72)
+		# Cube hand (slightly flattened so it reads as a palm gripping the gun)
+		_block(skel.get_bone_name(d.wrist), Vector3(0.66, 0.68, 0.5), hand_material, -0.06)
 
 
-func _sleeve(bone: String, length: float, r0: float, r1: float, mat: Material, start: float) -> void:
+func _block(bone: String, size: Vector3, mat: Material, start: float) -> void:
 	var att := BoneAttachment3D.new()
 	att.bone_name = bone
 	skel.add_child(att)
 	var mi := MeshInstance3D.new()
-	var c := CylinderMesh.new()
-	c.height = length
-	c.bottom_radius = r0
-	c.top_radius = r1
-	c.radial_segments = 12
-	c.rings = 1
-	mi.mesh = c
+	var b := BoxMesh.new()
+	b.size = size
+	mi.mesh = b
 	mi.material_override = mat
-	mi.position = Vector3(0, start + length * 0.5, 0)
+	mi.position = Vector3(0, start + size.y * 0.5, 0)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.extra_cull_margin = 4.0
 	att.add_child(mi)
 
 
@@ -222,10 +229,5 @@ func _flex_bone(b: int, flex_skel: Vector3, angle: float) -> void:
 
 
 func set_skin(dark: bool) -> void:
-	var tex: Texture2D = load("res://assets/arms/arm_albedo_dark.png" if dark else "res://assets/arms/arm_albedo_pale.png")
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = tex
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	m.roughness = 0.85
-	m.albedo_color = Color(0.86, 0.8, 0.76)
-	mesh.material_override = m
+	if hand_material:
+		hand_material.albedo_color = Color(0.56, 0.37, 0.25) if dark else Color(0.98, 0.8, 0.62)
