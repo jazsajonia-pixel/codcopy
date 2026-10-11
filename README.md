@@ -1,9 +1,8 @@
 # Strike Ops: Frontline
 
-An original, playable mobile-first military FPS MVP built with **Godot 4.7**, inspired by the structure of
-Call of Duty: Mobile (multiplayer modes, loadouts, Battle Royale, touch HUD). All branding, names and code are
-original; all third-party assets are CC0 / CC BY and listed in [ASSET_CREDITS.md](ASSET_CREDITS.md).
-Not affiliated with or endorsed by Activision.
+A mobile-first first-person shooter prototype built with **Godot 4.7.2**. Strike Ops: Frontline brings offline matches against bots, a Battle Royale mode, configurable controls, and a touch-oriented HUD into one playable project.
+
+Third-party assets and their licenses are listed in [ASSET_CREDITS.md](ASSET_CREDITS.md). This is an independent project and is not affiliated with or endorsed by Activision.
 
 > **Engine version note.** The brief asked for Godot **4.7.3**. At the time of writing that version does not exist —
 > the latest stable release is [4.7.2-stable (18 Aug 2026)](https://github.com/godotengine/godot/releases).
