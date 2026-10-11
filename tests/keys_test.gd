@@ -114,6 +114,7 @@ func _run() -> void:
 			check(m.player_dropped, "[br] Space jumps out of the aircraft")
 			t = 0.0
 			while t < 60.0 and not (p.parachute_state == 0 and p.is_on_floor()):
+				p.pitch = -1.3   # dive straight down like a player would
 				await _wait(0.25)
 				t += 0.25
 			check(p.is_on_floor(), "[br] landed (%.0f s)" % t)

@@ -69,6 +69,15 @@ func _ready() -> void:
 			MatchConfig.br_players = 12
 			MatchConfig.br_squad_size = 4
 			shots = [[17.0, "squad_downed"], [19.5, "squad_revive"]]
+		"drop":
+			# Manual drop: jump, glide forward, parachute, land in third person next to the squad.
+			MatchConfig.autoplay_player = false
+			MatchConfig.fast_test = true
+			MatchConfig.configure_br()
+			MatchConfig.br_players = 8
+			MatchConfig.br_squad_size = 4
+			SaveManager.set_setting("controls", "scheme", "keyboard")
+			shots = []
 		"results":
 			MatchConfig.last_results = {"mode": "tdm", "won": true, "kills": 12, "deaths": 4, "assists": 3, "score": 1450, "headshots": 4, "accuracy": 0.31,
 				"team_scores": {0: 40, 1: 33}, "duration": 312.0, "rewards": {"xp": 1850, "credits": 270, "levels": [9]},
@@ -140,6 +149,9 @@ func _process(delta: float) -> void:
 				p2.yaw += 2.6
 			if p2.downed:
 				p2.input.look = Vector2.ZERO
+	if what == "drop":
+		_drop_director()
+		return
 	if idx < shots.size() and t >= shots[idx][0]:
 		var img := get_viewport().get_texture().get_image()
 		var p: String = dir.path_join(shots[idx][1] + ".png")
@@ -151,3 +163,128 @@ func _process(delta: float) -> void:
 		idx += 1
 		if idx >= shots.size():
 			get_tree().quit()
+
+
+var _drop_step := 0
+var _drop_t := 0.0
+
+
+func _snap(n: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	var p: String = dir.path_join(n + ".png")
+	img.save_png(p)
+	print("SHOT ", p)
+
+
+func _drop_director() -> void:
+	var m = get_tree().current_scene
+	if m == null or m.get("player") == null or m.player == null:
+		return
+	var p: Player = m.player
+	p.invulnerable_time = 99.0
+	match _drop_step:
+		0:
+			if m.phase >= 1 and t > 3.0:
+				p.input.jump = true
+				p._jump_at = Time.get_ticks_msec()
+				_drop_step = 1
+				_drop_t = t
+		1:
+			p.input.move = Vector2(0, -1)
+			p.pitch = -0.25
+			if t - _drop_t > 3.0:
+				_snap("drop_glide")
+				_drop_step = 2
+		2:
+			p.input.move = Vector2(0, -1)
+			p.pitch = -1.2
+			if t - _drop_t > 4.5:
+				_snap("drop_dive")
+				_drop_step = 3
+		3:
+			p.input.move = Vector2(0, -0.6)
+			p.pitch = -0.35
+			if p.parachute_state == 2:
+				_drop_t = t
+				_drop_step = 4
+		4:
+			p.input.move = Vector2(0.3, -1)
+			if t - _drop_t > 1.5:
+				_snap("drop_chute")
+				_drop_step = 5
+		5:
+			if p.parachute_state == 0 and p.is_on_floor():
+				_drop_t = t
+				_drop_step = 6
+		6:
+			p.input.move = Vector2.ZERO
+			p.pitch = -0.12
+			if t - _drop_t > 2.5:
+				_snap("tpp_ground")
+				_drop_step = 7
+				_drop_t = t
+		7:
+			# Walk forward in third person with teammates following.
+			p.input.move = Vector2(0, -1)
+			p.input.sprint_held = t - _drop_t > 1.0
+			if t - _drop_t > 2.5:
+				_snap("tpp_sprint")
+				_drop_step = 8
+				_drop_t = t
+		8:
+			p.input.move = Vector2.ZERO
+			p.input.sprint_held = false
+			p.yaw += PI
+			_drop_step = 9
+		9:
+			if t - _drop_t > 1.5:
+				_snap("tpp_mates")
+				p.yaw += PI
+				p.inv.ammo.rifle = 120
+				p.inv.ammo.sniper = 20
+				p.inv.pick_up_weapon(WeaponInstance.create("ar_m4k", {"optic": "red_dot", "muzzle": "suppressor"}, "default", false))
+				p.inv.pick_up_weapon(WeaponInstance.create("sniper_ls7", {}, "default", false), false)
+				p.inv.heals.medkit = 2
+				p.inv.plates = 3
+				p.equip_current()
+				p.touch_mode = true
+				m.hud.touch.visible = true
+				m.hud._layout()
+				_drop_step = 10
+				_drop_t = t
+		10:
+			if t - _drop_t > 1.5:
+				_snap("hud_bar")
+				p.ads_on = true
+				_drop_step = 11
+				_drop_t = t
+		11:
+			if t - _drop_t > 1.0:
+				_snap("hud_ads")
+				p.ads_on = false
+				p.select_slot(1)
+				_drop_step = 12
+				_drop_t = t
+		12:
+			if t - _drop_t > 1.0:
+				p.ads_on = true
+			if t - _drop_t > 2.0:
+				_snap("hud_scope")
+				p.ads_on = false
+				SaveManager.set_setting("controls", "br_view", "fpp")
+				p.select_slot(0)
+				_drop_step = 13
+				_drop_t = t
+		13:
+			if t - _drop_t > 1.5:
+				_snap("hud_fpp")
+				m.hud.toggle_bag()
+				_drop_step = 14
+				_drop_t = t
+		14:
+			if t - _drop_t > 1.0:
+				_snap("bag")
+				get_tree().quit()
+	if t > 150.0:
+		print("drop director timed out at step ", _drop_step)
+		get_tree().quit()

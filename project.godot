@@ -7,7 +7,7 @@ config_version=5
 
 config/name="Strike Ops: Frontline"
 config/description="Original mobile military FPS MVP inspired by modern mobile shooters. Offline play with bots."
-config/version="0.5.1"
+config/version="0.6.0"
 run/main_scene="res://scenes/menus/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
