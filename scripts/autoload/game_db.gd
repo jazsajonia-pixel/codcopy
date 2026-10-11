@@ -114,11 +114,21 @@ const MP_MODES := {
 	"tdm": {"name": "Team Deathmatch", "desc": "5v5. First team to the score limit wins.", "score_limit": 40, "time_limit": 480.0, "team_size": 5},
 	"dom": {"name": "Domination", "desc": "5v5. Capture and hold flags A, B and C. Each held flag scores a point every 2 seconds.", "score_limit": 100, "time_limit": 600.0, "team_size": 5},
 	"ffa": {"name": "Free-For-All", "desc": "Every operator for themselves. First to 20 kills.", "score_limit": 20, "time_limit": 480.0, "players": 8},
+	"kc": {"name": "Kill Confirmed", "desc": "5v5. Kills drop dog tags. Grab enemy tags to score, grab friendly tags to deny.", "score_limit": 50, "time_limit": 600.0, "team_size": 5},
+	"hp": {"name": "Hardpoint", "desc": "5v5. Hold the active zone to score every second. The hardpoint moves every 60 seconds.", "score_limit": 150, "time_limit": 600.0, "team_size": 5},
+	"gun": {"name": "Gun Game", "desc": "Free-for-all. Every kill swaps you to the next weapon. A knife kill sets the victim back.", "score_limit": 14, "time_limit": 600.0, "players": 8},
 }
+
+## Gun Game weapon ladder (one kill each; finish the last tier to win). Knife kills set the victim back a tier.
+const GUN_LADDER := ["smg_vx", "ar_m4k", "sg_breacher", "smg_hornet", "ar_k47", "lmg_rpv", "sniper_ls7", "smg_wasp",
+	"dmr_skr", "sg_striker", "ar_ironclad", "launcher_thumper", "pistol_magnum", "pistol_p9"]
 
 const MP_MAPS := {
 	"outpost": {"name": "Outpost", "desc": "Fortified desert outpost with a central compound.", "scene": "res://scenes/maps/outpost.tscn"},
 	"crossroads": {"name": "Crossroads", "desc": "Urban intersection with shops and rooftops.", "scene": "res://scenes/maps/crossroads.tscn"},
+	"dockyard": {"name": "Dockyard", "desc": "Shipping port: container maze, a crane deck and a warehouse.", "scene": "res://scenes/maps/dockyard.tscn"},
+	"suburbia": {"name": "Suburbia", "desc": "Tiny cul-de-sac. Two houses, one street, non-stop action.", "scene": "res://scenes/maps/suburbia.tscn"},
+	"firebase": {"name": "Firebase", "desc": "Hilltop military camp with trenches, bunkers and a rooftop helipad.", "scene": "res://scenes/maps/firebase.tscn"},
 }
 
 const BR_ITEMS := {

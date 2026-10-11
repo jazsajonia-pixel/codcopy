@@ -37,6 +37,9 @@ func _ready() -> void:
 		"mp":
 			MatchConfig.configure_mp(parts[1] if parts.size() > 1 else "tdm", parts[2] if parts.size() > 2 else "outpost")
 			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
+		"over":
+			MatchConfig.configure_mp(parts[2] if parts.size() > 2 else "tdm", parts[1])
+			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
 		"scope":
 			MatchConfig.configure_mp("tdm", "outpost")
 			get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
@@ -81,6 +84,25 @@ func _process(delta: float) -> void:
 		snap(what.replace(":", "_"))
 		get_tree().quit()
 	if t > 120.0:
+		get_tree().quit()
+
+
+## Map overview: elevated orbit camera (over:<map>[:mode]).
+func _s_over(m, p: Player) -> void:
+	if step == 0 and t > 5.0:
+		var cam := Camera3D.new()
+		m.add_child(cam)
+		var r: Rect2 = m.map.bounds
+		var ext := maxf(r.size.x, r.size.y)
+		cam.global_position = Vector3(r.get_center().x + ext * 0.35, ext * 0.62, r.get_center().y + ext * 0.75)
+		cam.look_at(Vector3(r.get_center().x, 0, r.get_center().y))
+		cam.fov = 60
+		cam.far = 600
+		cam.current = true
+		st = t
+		step = 1
+	elif step == 1 and t - st > 0.8:
+		snap(what.replace(":", "_"))
 		get_tree().quit()
 
 

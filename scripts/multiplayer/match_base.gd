@@ -105,6 +105,7 @@ func _on_actor_died(victim: Actor, killer: Actor, weapon_name: String, headshot:
 		inv = -1
 		player.set_death_cam_target(killer)
 	kill_feed.emit(kname, victim.actor_name, weapon_name, headshot, inv)
+	last_kill_weapon = weapon_name
 	on_kill(victim, killer)
 
 
@@ -119,6 +120,9 @@ func _on_actor_knocked(victim: Actor, attacker: Actor, weapon_name: String) -> v
 ## Override in subclasses.
 func on_knock(_victim: Actor, _attacker: Actor) -> void:
 	pass
+
+
+var last_kill_weapon := ""   ## weapon name of the kill being processed by on_kill
 
 
 ## Override in subclasses.

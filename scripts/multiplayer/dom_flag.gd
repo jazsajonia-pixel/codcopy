@@ -13,6 +13,7 @@ var owner_team := -1           ## -1 neutral
 var progress := 0.0            ## -1 (team 1) .. +1 (team 0)
 var capturing_team := -1
 var contested := false
+var hardpoint := false         ## Hardpoint: whoever stands inside alone holds it instantly (no capture bar)
 var _flag_mat := StandardMaterial3D.new()
 var _ring_mat := StandardMaterial3D.new()
 var _flag: MeshInstance3D
@@ -76,6 +77,14 @@ func tick(delta: float, actors: Array) -> void:
 			count[a.team] += 1
 	contested = count[0] > 0 and count[1] > 0
 	capturing_team = -1
+	if hardpoint:
+		var holder := -1 if contested or (count[0] == 0 and count[1] == 0) else (0 if count[0] > 0 else 1)
+		capturing_team = holder
+		if holder != owner_team:
+			owner_team = holder
+			progress = 0.0 if holder < 0 else (1.0 if holder == 0 else -1.0)
+			_refresh_color()
+		return
 	if contested or (count[0] == 0 and count[1] == 0):
 		return
 	var t := 0 if count[0] > 0 else 1

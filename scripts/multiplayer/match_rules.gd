@@ -29,8 +29,8 @@ func setup(p_mode: String, p_score_limit: int, p_time_limit: float) -> void:
 func register_kill(killer_team: int, victim_team: int, killer_id: int) -> void:
 	if over:
 		return
-	if mode == "dom":
-		return   # Domination scores from flags (add_points), not kills
+	if mode in ["dom", "kc", "hp"]:
+		return   # objective modes score from flags / tags (add_points), not kills
 	if mode == "tdm":
 		if killer_team >= 0 and killer_team != victim_team:
 			team_scores[killer_team] = team_scores.get(killer_team, 0) + 1
@@ -62,7 +62,7 @@ func tick(delta: float) -> void:
 
 
 func leader() -> int:
-	if mode != "ffa":
+	if mode != "ffa" and mode != "gun":
 		if team_scores[0] == team_scores[1]:
 			return -1
 		return 0 if team_scores[0] > team_scores[1] else 1

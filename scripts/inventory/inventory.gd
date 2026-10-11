@@ -146,9 +146,9 @@ func load_from_loadout(lo: Dictionary, with_secondary: bool = false) -> void:
 	holstered = false
 	melee = lo.get("melee", "knife")
 	lethal = lo.get("lethal", "frag")
-	lethal_count = GameDB.EQUIPMENT.get(lethal, {}).get("count", 1)
+	lethal_count = GameDB.EQUIPMENT.get(lethal, {}).get("count", 1) if lethal != "" else 0
 	tactical = lo.get("tactical", "smoke")
-	tactical_count = GameDB.EQUIPMENT.get(tactical, {}).get("count", 1)
+	tactical_count = GameDB.EQUIPMENT.get(tactical, {}).get("count", 1) if tactical != "" else 0
 	changed.emit()
 
 

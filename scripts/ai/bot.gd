@@ -230,8 +230,8 @@ func _think() -> void:
 	if last_seen_t < 8.0:
 		state = State.INVESTIGATE
 		return
-	if match_node and match_node.has_method("objective_point") and not match_node.flags.is_empty():
-		var op: Vector3 = match_node.objective_point(self)
+	var op: Vector3 = match_node.objective_point(self) if match_node and match_node.has_method("objective_point") else Vector3.ZERO
+	if op != Vector3.ZERO:
 		if state != State.PATROL or global_position.distance_to(move_goal) < 2.0 or move_goal == Vector3.ZERO \
 				or op.distance_to(move_goal) > 8.0:
 			state = State.PATROL
