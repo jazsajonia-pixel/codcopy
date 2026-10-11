@@ -18,10 +18,10 @@ const LOOPED := ["idle", "walk", "sprint", "holding-both", "holding-both-shoot",
 ## logical clip -> clip name per rig (missing keys = same name)
 const RIG_CLIPS := {
 	"mini": {"melee": "attack-melee-right", "emote": "emote-yes", "hit": "interact-right"},
-	"blocky": {"crouch": "sit", "fall": "idle", "melee": "attack-melee-right", "emote": "emote-yes", "hit": "interact-right"},
+	"blocky": {"crouch": "idle", "fall": "idle", "melee": "attack-melee-right", "emote": "emote-yes", "hit": "interact-right"},
 	"toon": {"idle": "Idle", "walk": "Walk", "sprint": "Run", "crouch": "Duck", "fall": "Jump_Idle", "die": "Death",
 		"sit": "Idle", "drive": "Idle", "emote": "Wave", "melee": "Punch", "hit": "HitReact",
-		"holding-both": "Idle_Shoot", "holding-both-shoot": "Idle_Shoot", "holding-right": "Idle_Shoot", "holding-right-shoot": "Idle_Shoot"},
+		"holding-both": "Run_Gun", "holding-both-shoot": "Run_Shoot", "holding-right": "Idle_Shoot", "holding-right-shoot": "Idle_Shoot"},
 }
 const RIG_ARMS := {
 	"mini": ["arm-left", "arm-right"],
@@ -32,7 +32,6 @@ const RIG_ARMS := {
 }
 const RIG_AIM := {"mini": ["arm-left", "arm-right"], "blocky": [], "toon": ["Shoulder.L", "Shoulder.R"]}
 const RIG_HEAD := {"mini": "head", "blocky": "", "toon": "Neck"}
-const TOON_KEEP := ["Body", "Head", "ShoulderPad_L", "ShoulderPad_R"]
 
 var pose_root: Node3D      ## pivot at the hips; tilted for wingsuit / downed / death poses
 var model: Node3D
@@ -52,6 +51,10 @@ var _shadow_only := false
 var _tilt := 0.0
 var _clips := {}
 var _blocky_arms: Array[Node3D] = []
+var _blocky_legs: Array[Node3D] = []
+var _crouching := false
+var _walk_phase := 0.0
+var _gun_y := 1.08
 var _aim_pitch := 0.0
 var _crouch_drop := 0.0
 ## hit flinch spring (radians) and death physics
@@ -85,12 +88,13 @@ func setup(model_path: String) -> void:
 	if rig == "toon":
 		# Toon Shooter soldiers come with every gun of the kit parented to the hand; ours replaces them.
 		for m in model.find_children("*", "MeshInstance3D", true, false):
-			if not String(m.name) in TOON_KEEP:
+			if String(m.get_parent().name).begins_with("Index1"):
 				m.visible = false
 	_clips = RIG_CLIPS[rig]
+	_gun_y = 0.98 if rig == "toon" else 1.08
 	_normalise_scale()
 	gun_holder = Node3D.new()
-	gun_holder.position = Vector3(0.2, 1.08, -0.12)
+	gun_holder.position = Vector3(0.2, _gun_y, -0.12)
 	add_child(gun_holder)
 	if anim:
 		_build_tree()
@@ -167,6 +171,10 @@ func _build_tree() -> void:
 			if node:
 				arm_paths.append(anim_root.get_path_to(node))
 				_blocky_arms.append(node)
+		for nm in ["leg-left", "leg-right"]:
+			var lg := model.find_child(nm, true, false) as Node3D
+			if lg:
+				_blocky_legs.append(lg)
 	else:
 		var base := String(anim_root.get_path_to(skel))
 		for b in RIG_ARMS[rig]:
@@ -211,10 +219,15 @@ func _build_tree() -> void:
 
 ## Blocky characters have no skeleton: tilt the arm nodes by the aim pitch after the mixer runs.
 func _post_blocky() -> void:
-	if absf(_aim_pitch) < 0.001:
-		return
-	for a in _blocky_arms:
-		a.rotate_object_local(Vector3.RIGHT, _aim_pitch)
+	if absf(_aim_pitch) > 0.001:
+		for a in _blocky_arms:
+			a.rotate_object_local(Vector3.RIGHT, _aim_pitch)
+	# No crouch clip and single-block legs: squat by splaying the legs (one forward, one back).
+	if _crouch_drop > 0.01 and _blocky_legs.size() == 2:
+		var k := _crouch_drop / 0.19
+		var sw := sin(_walk_phase) * 0.35
+		_blocky_legs[0].rotation = Vector3(deg_to_rad(-48.0) * k + sw, 0, 0)
+		_blocky_legs[1].rotation = Vector3(deg_to_rad(42.0) * k - sw, 0, 0)
 
 
 func _wing_mat() -> StandardMaterial3D:
@@ -435,7 +448,9 @@ func update(delta: float, st: Dictionary) -> void:
 	# Hit flinch spring
 	_flinch_v += (-_flinch * 90.0 - _flinch_v * 12.0) * delta
 	_flinch += _flinch_v * delta
-	var crouch_low := 0.28 if rig == "blocky" and st.get("crouch", false) and loco == "walk" else 0.0
+	var crouch_low := 0.19 if rig == "blocky" and (st.get("crouch", false) or mode == "downed") and mode != "dead" else 0.0
+	if crouch_low > 0.0 and spd > 0.6:
+		_walk_phase += delta * spd * 2.2
 	_crouch_drop = lerpf(_crouch_drop, crouch_low, clampf(delta * 10.0, 0, 1))
 	if mode == "dead":
 		_tick_death(delta)
@@ -468,5 +483,5 @@ func update(delta: float, st: Dictionary) -> void:
 	if aim:
 		aim.pitch = _aim_pitch
 	gun_holder.rotation.x = st.get("pitch", 0.0)
-	gun_holder.position.y = 1.08 - _crouch_drop
+	gun_holder.position.y = _gun_y - _crouch_drop - (0.3 if rig != "blocky" and st.get("crouch", false) else 0.0)
 	gun_holder.visible = mode in ["ground", "chute"] and loco != "die" and loco != "emote"

@@ -5,7 +5,6 @@ extends SubViewportContainer
 var vp: SubViewport
 var stage: Node3D
 var model: Node3D
-var gun: Node3D
 var turntable := true
 var _yaw := 0.6
 
@@ -59,28 +58,25 @@ func set_operator(op_id: String, weapon_id: String = "") -> void:
 	if model:
 		model.queue_free()
 	var op := GameDB.get_operator(op_id)
-	model = load(op.model).instantiate()
-	model.scale = Vector3.ONE * 2.65
-	stage.add_child(model)
-	var anim: AnimationPlayer = model.find_child("AnimationPlayer", true, false)
-	var a := "holding-both" if weapon_id != "" else "idle"
-	if anim and anim.has_animation(a):
-		anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
-		anim.play(a)
-	if gun:
-		gun.queue_free()
-		gun = null
-	if weapon_id != "":
-		var w := GameDB.get_weapon(weapon_id)
-		if w:
-			gun = load(w.model_path).instantiate()
-			gun.position = Vector3(0.05, 0.62, 0.42)
-			gun.scale = Vector3.ONE * 0.8
-			gun.rotation.y = PI
-			stage.add_child(gun)
+	var am := ActorModel.new()
+	stage.add_child(am)
+	am.setup(op.model)
+	am.rotation.y = PI
+	model = am
+	_armed = weapon_id != ""
+	if _armed:
+		am.set_weapon(WeaponInstance.create(weapon_id))
+	_emote_t = 1.6   # greet the player with a wave / nod when the operator changes
+
+
+var _armed := false
+var _emote_t := 0.0
 
 
 func _process(delta: float) -> void:
 	if turntable:
 		_yaw += delta * 0.4
 	stage.rotation.y = _yaw
+	if model is ActorModel:
+		_emote_t = maxf(_emote_t - delta, 0.0)
+		(model as ActorModel).update(delta, {"speed": 0.0, "on_floor": true, "armed": _armed and _emote_t <= 0.0, "pitch": 0.0, "emote": _emote_t > 0.0})
