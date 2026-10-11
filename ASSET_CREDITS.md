@@ -13,7 +13,11 @@ License summary:
 
 | Asset (repo path) | Source | Author | License | Format | Conversion / changes |
 |---|---|---|---|---|---|
-| `assets/weapons/guns/*.glb` (11 files: `Rifle_Assault_West/East`, `Rifle_Battle_East`, `SMG_Full_West`, `SMG_Compact_West`, `Shotgun_Pump_West`, `Shotgun_Auto_East`, `Sniper_Rifle_West/East`, `Pistol_Full_West`, `Pistol_Compact_East`) | [CC0 Flat Guns West](https://opengameart.org/content/cc0-flat-guns-west) and [CC0 Flat Guns East](https://opengameart.org/content/cc0-flat-guns-east) (OpenGameArt) | Pichuliru | CC0 | GLB | None to the files. Scaled/rotated at runtime; optional tint overlay for weapon skins. |
+| `assets/weapons/guns/*.glb` (20 files: every Rifle / SMG / Shotgun / Sniper / Pistol variant in the West and East packs) | [CC0 Flat Guns West](https://opengameart.org/content/cc0-flat-guns-west) and [CC0 Flat Guns East](https://opengameart.org/content/cc0-flat-guns-east) (OpenGameArt) | Pichuliru | CC0 | GLB | None to the files. Scaled/rotated at runtime; optional tint overlay for weapon skins. |
+| `assets/characters/blocky/character-{a..r}.glb` + `Textures/` | [Blocky Characters 2.0](https://opengameart.org/sites/default/files/kenney_blocky-characters_2.0.zip) | Kenney | CC0 | GLB + PNG | None to the files. 18 operators; node-animated (no skeleton); height-normalised at runtime; crouch is a procedural leg pose. |
+| `assets/characters/toon/Character_{Soldier,Hazmat,Enemy}.gltf` | [Toon Shooter Game Kit](https://quaternius.com/packs/toonshootergamekit.html) | Quaternius | CC0 | glTF | None to the files. 3 skinned operators; the weapons built into the rigs are hidden at runtime. |
+| `assets/weapons/melee/{Knife_1,Knife_2,Shovel}.gltf`, `assets/weapons/launchers/{RocketLauncher,GrenadeLauncher,Revolver}.gltf` | [Toon Shooter Game Kit](https://quaternius.com/packs/toonshootergamekit.html) | Quaternius | CC0 | glTF | Wrapped in small `.tscn` scenes (`viper_rl`, `thumper_gl`, `magnum`) that rotate/scale them for the first-person view. |
+| `assets/props/toon/*.gltf` (Barrier_Large, CardboardBoxes_1, Container_Long/Small, Crate, Debris_BrokenCar, ExplodingBarrel, GasTank, Pallet, SackTrench, StreetLight, Structure_1/2, Tank, WaterTank_Platform) | [Toon Shooter Game Kit](https://quaternius.com/packs/toonshootergamekit.html) | Quaternius | CC0 | glTF | None. Static cover on the new maps and physics props (barrels, crates, gas tanks, boxes, pallets). |
 | `assets/weapons/grenade-a.glb`, `grenade-b.glb`, `assets/weapons/Textures/colormap.png` | [Blaster Kit](https://kenney.nl/assets/blaster-kit) | Kenney | CC0 | GLB + PNG | None. |
 | `assets/characters/character-{male,female}-{a..f}.glb`, `assets/characters/Textures/colormap.png` | [Mini Characters](https://kenney.nl/assets/mini-characters) | Kenney | CC0 | GLB + PNG | None. Scaled 2.65x at runtime; built-in animations (idle, walk, sprint, die, holding-both, ...) used. |
 | `assets/maps/city/*.glb` (building-a..h, building-skyscraper-a/b, detail-awning) + `Textures/colormap.png` | [City Kit (Commercial)](https://kenney.nl/assets/city-kit-commercial) | Kenney | CC0 | GLB + PNG | None. Scaled 9x at runtime; box colliders generated from mesh bounds. |
@@ -58,5 +62,5 @@ touch buttons) are generated in code.
 ## Evaluated but not used
 
 - [Quaternius Ultimate Gun Pack](https://opengameart.org/content/low-poly-guns-pack) (CC0) — FBX only; Flat Guns GLB used instead.
-- Kenney Blocky Characters, Kenney Crosshair Pack, Kenney Prototype Textures (CC0) — downloaded during research, not shipped.
+- Kenney Crosshair Pack, Kenney Prototype Textures (CC0) — downloaded during research, not shipped.
 - Mixamo was not used.

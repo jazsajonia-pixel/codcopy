@@ -58,7 +58,7 @@ func _process(delta: float) -> void:
 				stage = 1; t = 0
 		1:  # press the launch button
 			if t > 0.5:
-				var b := _find_btn(cs, "START MATCH" if round_mode == "tdm" else "DEPLOY")
+				var b := _find_btn(cs, "START")
 				check(b != null, "[%s] launch button found" % round_mode)
 				if b:
 					b.pressed.emit()

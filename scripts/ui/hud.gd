@@ -468,7 +468,7 @@ func _on_vehicle_changed(v: Vehicle) -> void:
 	touch.set_driving(v != null, v is Helicopter and player.vehicle_seat == 0)
 	overlay.visible = v == null
 	if v:
-		interact_label.text = ("Driving " if player.vehicle_seat == 0 else "Riding ") + v.display_name() + ("" if player.touch_mode else ("   [F] exit   [Space] climb   [C] descend" if v is Helicopter else "   [F] exit   [Space] handbrake"))
+		interact_label.text = (("Piloting " if v is Helicopter else "Driving ") if player.vehicle_seat == 0 else "Riding ") + v.display_name() + ("" if player.touch_mode else ("   [F] exit   [Space] climb   [C] descend" if v is Helicopter else "   [F] exit   [Space] handbrake"))
 	else:
 		interact_label.text = ""
 

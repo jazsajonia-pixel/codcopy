@@ -158,7 +158,7 @@ func _run() -> void:
 	rects = bar._layout()
 	check(rects.size() == 2 and rects[0].id == "weapon" and rects[1].id == "knife", "Multiplayer weapon bar shows only the gun and the knife")
 	bar.tap((rects[0].rect as Rect2).get_center())
-	check(p.input.switch_weapon, "tapping the Multiplayer gun card swaps weapons")
+	check(p.input.select_slot == 0 or p.input.inspect, "tapping the Multiplayer gun card draws / inspects the one gun")
 	await _frames(2)
 
 	# --- Backpack ---
@@ -190,7 +190,7 @@ func _run() -> void:
 	var hs := Vector2(p.velocity.x, p.velocity.z).length()
 	check(hs > 20.0 and -p.velocity.y < 20.0, "wingsuit glide: %.0f m/s forward, %.0f m/s down" % [hs, -p.velocity.y])
 	check(p.cam_tpp > 0.99 and p.camera.position.z > 6.0, "drop camera is third person and far back")
-	for i in 90:
+	for i in 240:   # physics-based: the dive accelerates under gravity against drag
 		p.input.move = Vector2(0, -1)
 		p.pitch = -1.3
 		await get_tree().physics_frame

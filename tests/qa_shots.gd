@@ -126,6 +126,36 @@ func _s_medal(m, p: Player) -> void:
 		get_tree().quit()
 
 
+## BR helicopter: skip the drop, board the airfield helicopter, climb and fly forward.
+var heli_ref: Helicopter
+func _s_heli(m, p: Player) -> void:
+	if step == 0 and t > 3.0:
+		m._drop_player()
+		for v in get_tree().get_nodes_in_group("vehicles"):
+			if v is Helicopter:
+				heli_ref = v
+				break
+		p.parachute_state = 0
+		p.global_position = heli_ref.global_position + Vector3(4, 1, 0)
+		p.velocity = Vector3.ZERO
+		step = 1
+		st = t
+	elif step == 1 and t - st > 1.0:
+		heli_ref.enter(p, 0)
+		Input.action_press("jump")
+		step = 2
+		st = t
+	elif step == 2:
+		p.input.move = Vector2(0, -0.6) if t - st > 5.0 else Vector2.ZERO
+		if t - st > 3.0 and t - st < 3.1:
+			snap("heli_takeoff")
+		if t - st > 8.0:
+			Input.action_release("jump")
+			print("HELI alt=", heli_ref.altitude(), " speed=", heli_ref.linear_velocity.length(), " hp=", heli_ref.health)
+			snap("heli_flying")
+			get_tree().quit()
+
+
 func _s_scope(m, p: Player) -> void:
 	match step:
 		0:

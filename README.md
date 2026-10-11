@@ -15,9 +15,9 @@ Third-party assets and their licenses are listed in [ASSET_CREDITS.md](ASSET_CRE
 
 | Area | State |
 |---|---|
-| Offline Team Deathmatch (5v5), Domination (5v5) and Free-For-All (8) vs bots | Playable, tested headless end-to-end |
+| Offline Team Deathmatch, Domination, Kill Confirmed, Hardpoint (5v5), Free-For-All and Gun Game (8) vs bots on 5 maps | Playable, tested headless end-to-end |
 | Offline Battle Royale (8-20 operators), Solo / Duo / Squad with AI teammates | Playable, tested headless end-to-end |
-| Drivable vehicles (BR) | Implemented; physics tested headless, driven with injected touch input |
+| Drivable vehicles + pilotable helicopters (BR) | Implemented; car physics and helicopter flight model tested headless |
 | LAN Team Deathmatch (2+ humans + bots) | Implemented; tested with **two processes on one machine** (localhost), not across real devices |
 | Touch controls + HUD editor | Implemented; multi-touch verified with injected touch events (not on a physical phone) |
 | Keyboard/mouse | Implemented; used for desktop play |
@@ -51,21 +51,24 @@ aiming).
    window so it has keyboard focus. In Battle Royale press JUMP / Space to leave the aircraft first.
 
 ### Touch (default on touchscreen devices)
-- **Left side**: floating movement joystick. Push fully forward to auto-sprint; drag past the top to lock sprint.
-- **Right side**: drag anywhere empty to look. Dragging on **FIRE** or **ADS** also aims (fire-and-steer).
+- **Left side**: floating movement joystick with an adjustable deadzone; the base follows your thumb if you drag past
+  its edge. Push fully forward to auto-sprint; drag past the top to lock sprint.
+- **Right side**: drag anywhere empty to look (aim acceleration curve, jitter smoothing and a separate vertical speed,
+  all adjustable). Dragging on **FIRE** or **ADS** also aims (fire-and-steer).
 - Buttons: FIRE (right, plus optional left FIRE), ADS, JUMP, CROUCH (tap while sprinting to slide), RELOAD,
   FRAG (lethal), TACT (tactical), PICK/OPEN (appears near loot), SPRINT, HEAL / PLATE / BAG / VIEW (BR only), TAB (scoreboard), II (pause).
 - **Weapon bar** (bottom centre, CODM style): in Battle Royale it shows weapon 1, weapon 2 and fists/knife - tap a card
-  to equip it. In Multiplayer it shows the gun in your hands (tap to swap to the other one) and the knife (tap = quick
-  melee). The old SWAP and KNIFE buttons are hidden by default and can be turned back on in the HUD editor.
+  to equip it. In Multiplayer it shows your one gun (tap to draw it, tap again to inspect) and your melee weapon
+  (tap = knife out / swing). The old SWAP and KNIFE buttons are hidden by default and can be turned back on in the HUD editor.
 - While aiming down sights every button except FIRE and ADS fades out (and the weapon bar dims), so the sight is clear.
 - During the BR drop JUMP becomes **CHUTE** (open the parachute) and **CUT** (close it again while high enough).
 - The interact button changes with context: PICK / OPEN near loot, DRIVE / RIDE near a vehicle, REVIVE (hold) near a downed teammate.
 - **Driving**: the joystick steers and accelerates, drag the right side to orbit the chase camera, BRAKE = handbrake,
-  EXIT gets out. Weapon buttons are hidden while driving.
+  EXIT gets out. **Flying** a helicopter: the joystick tilts it, UP / DOWN climb and descend, and it turns to face
+  where you look. Weapon buttons are hidden while driving.
 - Each finger is owned by exactly one control, so pressing a button never rotates the camera, and fire + move + look work simultaneously.
 - Layout respects the device safe area (notches/cut-outs).
-- **HUD editor** (Home > HUD LAYOUT, or Settings > Controls): drag to move, slider to resize, opacity, show/hide per button, Reset, Save. Saved to `user://settings.cfg`.
+- **HUD editor** (Lobby > HUD LAYOUT, or Settings > Controls): drag to move, slider to resize, opacity, show/hide per button, Reset, Save. Saved to `user://settings.cfg`.
 
 ### Keyboard & mouse
 | Action | Key | Action | Key |
@@ -86,15 +89,23 @@ Click the game window to capture the mouse.
 
 ## Features
 
-### Front end
-- Main menu with profile name, level, XP bar, credits, and a 3D operator preview.
-- Multiplayer select (mode, map, bot difficulty), Battle Royale select (Solo / Duo / Squad, lobby size, difficulty),
+### Front end (CODM-style lobby)
+- **Lobby**: top bar with avatar, name, level and XP, MULTIPLAYER / BATTLE ROYALE tabs, credits and settings; the
+  operator on a lit stage in the middle; season / daily missions / career cards on the left; a mode card ("TEAM
+  DEATHMATCH - Outpost", tap to change) and a big gold **START** button on the right; a bottom bar with Loadout,
+  Operators, Online, Career, HUD Layout and Credits. Dark slate panels, gold accent and slanted buttons throughout.
+- Multiplayer select (mode cards, map cards, bot difficulty; remembered for the lobby START), Battle Royale select (Solo / Duo / Squad, lobby size, difficulty),
   Online (LAN) page (host, join by IP, player list, map, START LAN TEAM DEATHMATCH).
-- **Loadout editor**: 3 saved loadouts; primary, secondary, melee, lethal, tactical; per-weapon attachments
+- **Loadout editor**: 3 saved loadouts; Multiplayer follows the CODM rule of **one primary gun + melee** (plus lethal
+  and tactical; no secondary - Battle Royale weapons come from loot); a rotating 3D weapon preview; per-weapon attachments
   (optic, muzzle, barrel, grip, magazine, stock) and skins; stat bars with +/- comparison to the previous choice.
-- **Operators**: 12 operators with 3D preview, unlocked by level.
+- **Operators**: 33 chibi operators with 3D preview, unlocked by level: 12 Kenney Mini Characters, 18 Kenney Blocky
+  Characters and 3 Quaternius Toon Shooter soldiers (Sentinel, Hazard, Crimson). One `ActorModel` drives all three
+  rigs (skinned, node-animated and Mixamo-like) with height normalisation, clip mapping, aim pitch, melee swings,
+  hit flinches and physics-driven death falls.
 - **Settings** (only settings that actually affect the game are shown): control scheme, sprint mode, ADS tap/hold,
   invert Y, aim assist (touch), simple-mode auto-fire, gyroscope (mobile only), camera / mouse / ADS / per-optic sensitivity,
+  vertical look speed, aim acceleration, look smoothing, joystick deadzone,
   master / music / effects volume, graphics preset, render scale, shadows, effects quality, MSAA, FPS cap, FOV, FPS counter,
   enemy highlight color, hit marker size, camera shake, touch button size & opacity.
 - Loading screen (tips; the match scene is loaded synchronously after the screen is drawn), results screen (outcome, K/D/A, score, headshots, accuracy, XP, credits,
@@ -103,8 +114,10 @@ Click the game window to capture the mouse.
   Everything persists in `user://profile.json`. There are **no paid items**; credits are only a play reward.
 
 ### Gunplay
-- 11 data-driven weapons (`resources/weapons/*.tres`): 2 ARs, 2 SMGs, LMG, 2 shotguns, bolt sniper, DMR, 2 pistols.
-  Each defines damage, headshot multiplier, pellets, range/falloff, RPM, fire mode (auto / semi / pump / bolt),
+- 23 data-driven weapons (`resources/weapons/*.tres`): 3 ARs (incl. the Ironclad 3-round burst), 4 SMGs, LMG,
+  4 shotguns, 3 snipers (incl. two anti-materiel rifles), DMR, 4 pistols (incl. a magnum), and 2 launchers (Viper
+  rocket launcher, Thumper grenade launcher - BR loot only) firing real projectiles with gravity, bounces and splash.
+  Each defines damage, headshot multiplier, pellets, range/falloff, RPM, fire mode (auto / semi / burst / pump / bolt),
   magazine, reserve, reload (tactical/empty), ADS time and FOV, hip/ADS/move spread, bloom, recoil and recovery, mobility.
 - Hitscan with spread cone, damage falloff, headshots, wall penetration blocked, tracers, impacts, muzzle flash,
   hit markers (headshot/kill variants), damage direction indicators, kill feed, kill streak callouts.
@@ -116,7 +129,17 @@ Click the game window to capture the mouse.
   standing, or just after getting up = crouch.
 - 15 attachments with real stat modifiers; suppressors hide you from the enemy radar.
 - Frag, sticky charge, smoke (blocks bot vision), flash (blinds player and bots); melee knife/hatchet/baton.
-- First-person view model with bob, sway, recoil kick, reload and switch animations, optic models, skin tint.
+- First-person view model with bob, sway, recoil kick, reload and switch animations, optic models, skin tint,
+  ejected shell casings, muzzle smoke, a **weapon inspect** animation (Y key / D-pad left / tap the active gun card)
+  and visible melee weapons with slash animations.
+- **Magnified scopes** (fixed: the 4x/8x view used to be covered by a black disc - the scope tube model sat in front of
+  the camera). Sniper and ACOG scopes now render a proper scope overlay with mil-dots / chevrons, scope-in fade,
+  breathing sway and lens edge; a 3x optic was added.
+- **Effects**: pooled GPU particle bursts for blood, dust, sparks, debris and chunks, fire and smoke; big explosions
+  with shockwave rings, scorch decals and debris; landing dust; rotor wash.
+- **Physics**: bullets and explosions push physics props (explosive barrels, gas tanks, crates, boxes, pallets) that
+  can be shot and blown up; explosion knockback on players and bots; hit flinches; ragdoll-like death falls in the
+  direction of the killing hit.
 - **First-person arms**: rigged CC0 arms ([WRAD Arms](https://github.com/wwwriks/wrad-arms)) posed with two-bone IK
   onto each gun's grip, trigger and support points. The support hand follows the magazine on reloads, works the pump
   or bolt between shots, and there are poses for throwing, healing / plating, knife jabs and unarmed punches.
@@ -125,13 +148,21 @@ Click the game window to capture the mouse.
 ![First-person arms during a reload](docs/screenshots/arms_reload.jpg)
 
 ### Multiplayer (offline vs bots)
-- **Team Deathmatch** (5v5, first to 40 or 8 minutes), **Domination** (5v5, flags A/B/C, first to 100) and
-  **Free-For-All** (8 players, first to 20).
+- **Team Deathmatch** (5v5, first to 40 or 8 minutes), **Domination** (5v5, flags A/B/C, first to 100),
+  **Free-For-All** (8 players, first to 20), **Kill Confirmed** (5v5, kills drop dog tags: grab enemy tags to score,
+  friendly tags to deny; first to 50), **Hardpoint** (5v5, one zone that moves every 60 s, a point per second while
+  held alone; first to 150) and **Gun Game** (8 players, every kill swaps you to the next of 14 weapons; a knife kill
+  sets the victim back a tier).
+- **Kill feedback**: CODM-style hex medals (Double/Triple/Fury kill, Headshot, Longshot, First Blood, Point Blank,
+  kill streaks), "+score" popups and an ELIMINATED banner.
 - Domination: stand in a flag's ring to capture it (faster with more teammates, frozen while contested); each held
   flag scores a point every 2 s. Bots push flags their team doesn't own and defend otherwise. Flag strip on the HUD
   and flags on the minimap.
 - **UAV scorestreak**: 3 kills without dying reveals the enemy team on the minimap for 20 s (bots get it too).
-- Maps: **Outpost** (desert compound) and **Crossroads** (urban intersection), built procedurally from Kenney kits.
+- Maps: **Outpost** (desert compound), **Crossroads** (urban intersection), **Dockyard** (container port with a
+  walkable crane deck and a warehouse), **Suburbia** (small two-house cul-de-sac for non-stop close fights) and
+  **Firebase** (military camp with trenches, bunkers and a rooftop helipad), built procedurally from Kenney and
+  Quaternius kits.
 - Pre-match countdown, spawn selection away from enemies, 3.5 s respawn, spawn protection, radar pings when firing unsuppressed.
 
 ![Domination: holding flag B](docs/screenshots/domination.jpg)
@@ -153,12 +184,18 @@ Click the game window to capture the mouse.
 ![LAN lobby](docs/screenshots/lan_lobby.jpg)
 
 ### Battle Royale (offline vs bots)
-- **Isla Verde**: 400 m island with terrain, water and six POIs (Harbor Town, Depot, Farmstead, Radar Hill, Crossing, Pine Ridge).
+- **Isla Verde**: expanded to about 560 m (1.6x) with terrain, a central ridge, dirt roads and nine POIs (Harbor
+  Town, Depot, Farmstead, Radar Hill, Crossing, Pine Ridge, plus the new **Airfield** with runway, hangars and two
+  helipads, **Military Base** with walls, barracks and watchtowers, and **Fishing Village** with a pier). The safe zone
+  starts larger and has an extra phase.
 - **Third-person view** (default in BR, like CODM's BR TPP; Multiplayer is always first person). Over-the-shoulder
   camera that pulls in when a wall is behind you; aiming down sights switches to the first-person sight; the VIEW
   button / Z key (or Settings > Controls > Battle Royale view) switches between first and third person.
-- **Drop**: boarding countdown, then a higher (240 m) and slower aircraft. After jumping you fly a **wingsuit**: push
-  forward to glide (about 27 m/s forward, 15 m/s down), look down to dive (up to 42 m/s down). The **parachute** opens
+- **Drop**: boarding countdown, then a higher (240 m) aircraft. The drop is now physics-based (`DropPhysics`: gravity
+  plus quadratic drag towards terminal speeds). After jumping you fly a **wingsuit**: push forward to glide (about
+  30 m/s forward, 13 m/s down), look down to dive (up to 52 m/s down). The **parachute** is clearly slower: it
+  inflates over about a second with an opening shock, then sinks at about 4 m/s (2.6 m/s when flaring) and drifts
+  forward at 8 m/s. Landing kicks up dust. The parachute opens
   by itself at 45 m or earlier with CHUTE/Space, can be closed again with CUT/Space above 28 m, and you can fire from
   the hip under the canopy. The camera pulls back while dropping, and the HUD shows altitude and speed. Bots use the
   same wingsuit and parachute.
@@ -181,6 +218,12 @@ Click the game window to capture the mouse.
   damaged, and an explosion when destroyed (occupants are thrown out and take damage). Running over enemies hurts
   them; teammates and empty rolling cars don't. Bullets and explosions damage vehicles and pass part of the damage
   to the people inside. Vehicles show on the minimap. Bots don't drive (they only ride with you).
+
+- **Helicopters** (Airfield and Military Base): 4 seats (pilot + 3 passengers). Rigid-body flight model: rotor RPM
+  spins up when the pilot boards, collective (UP / DOWN buttons, Space / C) sets the climb rate and hands-off holds
+  altitude, the stick tilts the airframe so the rotor thrust pulls it forward or sideways, the nose follows your camera,
+  quadratic air drag, a ground cushion for landings, crash damage from hard impacts, rotor wash dust, and the usual
+  vehicle damage / explosion. The HUD shows altitude and rotor RPM.
 
 ![Driving on Isla Verde](docs/screenshots/br_vehicle.jpg)
 ![Downed in a squad match](docs/screenshots/br_squad_downed.jpg)
@@ -221,10 +264,14 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the systems fit togethe
 
 ```bash
 godot --headless -s res://tests/check_scripts.gd                       # parse/load every script & scene
-godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- unit    # 42 unit tests
+godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- unit    # 81 unit tests (incl. drop physics, new modes/maps/operators)
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- menus   # menu pages, loadout, LAN host, HUD editor
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- tdm     # full TDM match, player driven by autopilot
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- ffa
+godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- kc      # Kill Confirmed on Dockyard
+godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- hp      # Hardpoint on Firebase
+godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- gun     # Gun Game on Suburbia
+godot --headless --fixed-fps 60 res://tests/heli_test.tscn              # helicopter flight model (climb, hover, cyclic, yaw, landing)
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- br      # full BR match (shortened timings)
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- touch   # injected multi-touch input checks
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- flow    # menu -> loading screen -> match with touch HUD (MP + BR + driving)

@@ -287,8 +287,8 @@ func _ride(delta: float) -> void:
 		var down_held := Input.is_action_pressed("crouch")
 		var tc = get_meta("touch_controls", null)
 		if touch_mode and tc and is_instance_valid(tc):
-			brake_held = tc.is_held("jump")
-			down_held = tc.is_held("crouch")
+			brake_held = brake_held or tc.is_held("jump")
+			down_held = down_held or tc.is_held("crouch")
 		if MatchConfig.autoplay_player:
 			brake_held = false
 		if v is Helicopter:

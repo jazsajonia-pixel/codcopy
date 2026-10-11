@@ -24,7 +24,7 @@ var failed := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	limit = {"tdm": 330.0, "ffa": 330.0, "br": 600.0, "touch": 40.0}.get(mode, 300.0)
+	limit = {"tdm": 330.0, "ffa": 330.0, "kc": 330.0, "hp": 330.0, "gun": 330.0, "br": 600.0, "touch": 40.0}.get(mode, 300.0)
 
 
 func check(cond: bool, name: String) -> void:
@@ -112,6 +112,22 @@ func _on_results() -> void:
 				top = maxi(top, int(row.kills))
 		check(top >= MatchConfig.score_limit or float(r.get("duration", 0)) >= MatchConfig.time_limit - 1.0, "match ended by score or time limit")
 		check(player_shots > 0 and int(r.get("kills", 0)) + int(r.get("deaths", 0)) + int(r.get("assists", 0)) > 0, "player fought (%d shots, K/D/A %d/%d/%d)" % [player_shots, r.get("kills", 0), r.get("deaths", 0), r.get("assists", 0)])
+	if mode in ["kc", "hp"]:
+		var ts2: Dictionary = r.get("team_scores", {})
+		var tot := 0
+		for k in ts2.keys():
+			tot += int(ts2[k])
+		check(tot > 0, "%s objective scored points (%s)" % [mode, str(ts2)])
+	if mode == "gun":
+		var m = get_tree().current_scene
+		var best := 0
+		if m and m.get("gun_tier") != null:
+			for a in m.gun_tier.keys():
+				best = maxi(best, int(m.gun_tier[a]))
+		var top_k := 0
+		for row in r.get("scoreboard", []):
+			top_k = maxi(top_k, int(row.kills))
+		check(top_k >= 2, "gun game: operators progressed through the ladder (top %d kills)" % top_k)
 	if mode == "br":
 		check(player_landed, "player deployed and landed")
 		check(player_had_weapon, "player looted a weapon")

@@ -5,6 +5,31 @@ container on 10 Oct 2026. Match suites use `--fixed-fps 60` (simulated time, not
 real time. Godot 4.7.3 does not exist yet, so nothing was tested on it. Screenshots were rendered under Xvfb with
 `--rendering-driver opengl3` (Compatibility), **not** the Mobile Vulkan renderer the project is configured for.
 
+## Round 0.7.0 (12 Oct 2026): CODM lobby, new operators/weapons/maps/modes, helicopter, physics drop
+
+Godot 4.7.2, headless unless noted; each suite run one at a time after the last code change of this round.
+Visual checks were rendered under Xvfb with the Mobile renderer on lavapipe (software Vulkan).
+
+| Suite | Result |
+|---|---|
+| Script/scene check | 137 resources, 0 failures |
+| `unit` (now incl. drop physics: glide vs parachute terminal speeds, chute inflation; gun-game ladder; new modes/maps/operator models exist) | 81/0 |
+| `menus` / `touch` / `flow` (lobby START flow for MP and BR) | 19/0, 9/0, 18/0 |
+| `tdm` / `ffa` / `dom` / `vehicle` / `squad` / `moves` | 5/0, 5/0, 10/0, 20/0, 19/0, 17/0 |
+| **`kc` (new)** Kill Confirmed on Dockyard | 4/0 (tags collected: 4 - 8) |
+| **`hp` (new)** Hardpoint on Firebase | 4/0 (5 - 20) |
+| **`gun` (new)** Gun Game on Suburbia | 4/0 |
+| **`heli_test.tscn` (new)** climb, level climb, hover hold (0.07 m drift), forward flight 27 m/s nose-down, yaw to camera heading, stick-release braking, soft landing with no damage | 11/0 |
+| `br` / `br_squad` (expanded 560 m island) | 8/0 / 8/0 |
+| `brfeat` (dive test lengthened to 4 s because the dive now accelerates physically; MP gun card now draws/inspects instead of swapping) | 38/0 |
+| `keys` under Xvfb 1280x720 | first 23 checks passed, then the run hit the 280 s time limit in the BR part (software rendering of the larger island); at 640x360 it completed 27/1 - the one failure ("holding W in touch mode") passed in the 1280x720 run |
+
+Not re-run this round: the LAN test (`tests/run_net_test.sh`) and `phone`.
+
+Visual checks: scope overlays (sniper, 4x), all 23 weapons in first person (hip/ADS), operator lineup (Mini, Blocky, Toon
+rigs: idle, armed, walk, crouch, death), new map overviews and in-match views (Dockyard KC, Suburbia Gun Game,
+Firebase Hardpoint), helicopter take-off and flight in BR, lobby / mode select / loadout / operators pages, medals.
+
 ## Round 0.6.0 (11 Oct 2026): TPP, weapon bar, drop, auto loot, backpack
 
 Same environment (Godot 4.7.2, headless unless noted). Every suite was run one at a time after the last code change

@@ -1,7 +1,7 @@
 extends Node
 ## Automated tests. Run headless from the project folder:
 ##   godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- unit
-##   godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- tdm | ffa | br | touch | menus | flow
+##   godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- tdm | ffa | kc | hp | gun | br | touch | menus | flow
 ## Exit code 0 = pass. Match tests drive the player with the bot AI ("autoplay") and short limits.
 
 var mode := "unit"
@@ -27,7 +27,7 @@ func _ready() -> void:
 		"unit":
 			await _unit()
 			_finish()
-		"tdm", "ffa", "br", "br_squad", "touch":
+		"tdm", "ffa", "br", "br_squad", "touch", "kc", "hp", "gun":
 			_start_match_test()
 		"net_host", "net_client":
 			var nt: Node = load("res://tests/net_test.gd").new()
@@ -75,6 +75,32 @@ func _finish() -> void:
 # ---------------------------------------------------------------- unit
 
 func _unit() -> void:
+	# Drop physics: wingsuit glide sinks clearly faster than an open parachute; the canopy inflates
+	# over time (opening shock) and both converge to terminal speeds instead of fixed velocities.
+	var fwd3 := Vector3(0, 0, -1)
+	var vg := Vector3(0, -30, 0)
+	var vc := Vector3(0, -30, 0)
+	var vc_early := Vector3.ZERO
+	for i in 600:
+		vg = DropPhysics.step(vg, fwd3, fwd3, 0.0, false, 0.0, 0.0, 1.0 / 60.0)
+		vc = DropPhysics.step(vc, fwd3, fwd3, 0.0, true, minf(i / 60.0 / DropPhysics.INFLATE_TIME, 1.0), 0.0, 1.0 / 60.0)
+		if i == 20:
+			vc_early = vc
+	check(absf(-vg.y - DropPhysics.GLIDE_SINK) < 3.0, "glide converges to ~%d m/s sink (%.1f)" % [DropPhysics.GLIDE_SINK, -vg.y])
+	check(absf(-vc.y - DropPhysics.CHUTE_SINK) < 1.5, "parachute converges to ~%.1f m/s sink (%.1f)" % [DropPhysics.CHUTE_SINK, -vc.y])
+	check(-vc.y < -vg.y * 0.5, "parachute descends slower than the glide")
+	check(-vc_early.y > -vc.y + 3.0, "parachute decelerates gradually while inflating")
+	check(Vector2(vg.x, vg.z).length() > Vector2(vc.x, vc.z).length(), "glide flies forward faster than the parachute")
+	# Gun Game ladder weapons exist; new MP modes and maps are registered with scenes.
+	for gid in GameDB.GUN_LADDER:
+		check(GameDB.weapons.has(gid), "gun game ladder weapon %s exists" % gid)
+	for mid in ["kc", "hp", "gun"]:
+		check(GameDB.MP_MODES.has(mid), "mode %s registered" % mid)
+	for map_id in GameDB.MP_MAPS.keys():
+		check(ResourceLoader.exists(GameDB.MP_MAPS[map_id].scene), "map %s scene exists" % map_id)
+	for op in GameDB.OPERATORS:
+		if not ResourceLoader.exists(op.model):
+			check(false, "operator %s model exists" % op.id)
 	# Weapon data
 	check(GameDB.weapons.size() >= 10, "weapon database loaded (%d weapons)" % GameDB.weapons.size())
 	for id in GameDB.weapons.keys():
@@ -285,9 +311,10 @@ func _start_match_test() -> void:
 		MatchConfig.br_players = 12 if mode == "br_squad" else 10
 		MatchConfig.br_squad_size = 4 if mode == "br_squad" else 1
 	else:
-		MatchConfig.configure_mp("ffa" if mode == "ffa" else "tdm", "crossroads" if mode == "ffa" else "outpost")
-		MatchConfig.score_limit = 12 if mode == "tdm" else 6
-		MatchConfig.time_limit = 150.0
+		var maps := {"ffa": "crossroads", "kc": "dockyard", "hp": "firebase", "gun": "suburbia"}
+		MatchConfig.configure_mp(mode if mode in ["ffa", "kc", "hp", "gun"] else "tdm", maps.get(mode, "outpost"))
+		MatchConfig.score_limit = {"tdm": 12, "kc": 8, "hp": 40}.get(mode, 6)
+		MatchConfig.time_limit = 150.0 if mode != "hp" else 110.0
 	if mode == "touch":
 		SaveManager.set_setting("controls", "scheme", "touch")
 	get_tree().change_scene_to_file.call_deferred(MatchConfig.match_scene())
