@@ -3,13 +3,13 @@ extends Resource
 ## Data-driven weapon definition. Add a new .tres in res://resources/weapons/ to add a weapon;
 ## GameDB discovers every file in that folder automatically.
 
-enum FireMode { AUTO, SEMI, BOLT, PUMP }
+enum FireMode { AUTO, SEMI, BOLT, PUMP, BURST }
 
 @export var id: String = ""
 @export var display_name: String = ""
-@export_enum("AR", "SMG", "SHOTGUN", "SNIPER", "LMG", "PISTOL") var category: String = "AR"
+@export_enum("AR", "SMG", "SHOTGUN", "SNIPER", "LMG", "PISTOL", "LAUNCHER") var category: String = "AR"
 @export var description: String = ""
-@export_file("*.glb") var model_path: String = ""
+@export_file("*.glb", "*.tscn", "*.gltf") var model_path: String = ""
 @export var fire_mode: FireMode = FireMode.AUTO
 @export var burst_count: int = 1
 
@@ -46,7 +46,7 @@ enum FireMode { AUTO, SEMI, BOLT, PUMP }
 @export_group("Presentation")
 @export_file("*.ogg", "*.wav") var fire_sound: String = ""
 @export_file("*.ogg", "*.wav") var reload_sound: String = ""
-@export var ammo_type: String = "rifle" ## rifle | smg | shotgun | sniper | pistol
+@export var ammo_type: String = "rifle" ## rifle | smg | shotgun | sniper | pistol | rocket
 @export var view_offset: Vector3 = Vector3(0.18, -0.17, -0.38)
 @export var ads_offset: Vector3 = Vector3(0.0, -0.075, -0.28)
 @export var tracer_every: int = 2

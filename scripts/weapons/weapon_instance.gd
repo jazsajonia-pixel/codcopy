@@ -14,6 +14,7 @@ var mag: int = 0
 var _reserve: int = 0
 var inventory: WeakRef = null ## Inventory; when it uses shared ammo pools (BR), reserve comes from there.
 
+var burst_left := 0   ## rounds still to fire in the current burst
 var cooldown := 0.0
 var reloading := false
 var reload_left := 0.0
@@ -79,6 +80,21 @@ func tick(delta: float) -> void:
 
 ## Call every physics frame with the trigger state. Returns true when a shot should be fired now.
 func try_fire(trigger_down: bool) -> bool:
+	# Burst weapons finish the burst on their own once started.
+	if burst_left > 0 and not reloading:
+		if cooldown > 0.0:
+			return false
+		if mag <= 0:
+			burst_left = 0
+			return false
+		burst_left -= 1
+		mag -= 1
+		cooldown = 60.0 / maxf(float(stats.fire_rate_rpm), 1.0)
+		if burst_left == 0:
+			cooldown += 0.22   # pause between bursts
+		bloom = minf(bloom + stats.spread_per_shot_deg, stats.max_bloom_deg)
+		fired.emit()
+		return true
 	if not trigger_down:
 		_trigger_released = true
 		return false
@@ -100,6 +116,10 @@ func try_fire(trigger_down: bool) -> bool:
 	_trigger_released = false
 	mag -= 1
 	cooldown = 60.0 / maxf(float(stats.fire_rate_rpm), 1.0)
+	if data.fire_mode == WeaponData.FireMode.BURST:
+		burst_left = maxi(data.burst_count - 1, 0)
+		if burst_left == 0:
+			cooldown += 0.22
 	bloom = minf(bloom + stats.spread_per_shot_deg, stats.max_bloom_deg)
 	fired.emit()
 	return true

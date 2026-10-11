@@ -38,6 +38,11 @@ var bolt_rest := Vector3.ZERO
 var slide_bone := -1
 var slide_rest := Vector3.ZERO
 var _punch_side := 0
+var blade: Node3D               ## melee weapon model shown while holstered (Multiplayer knife etc.)
+var blade_scale := 0.25
+var melee_id := ""
+var inspect_t := 0.0            ## > 0 while playing the weapon inspect animation
+const INSPECT_TIME := 2.2
 
 
 func _ready() -> void:
@@ -84,6 +89,9 @@ func set_weapon(w: WeaponInstance) -> void:
 	muzzle_local = Vector3(0, 0.015, -0.3)
 	scope_local = Vector3(0, 0.04, 0.0)
 	mag_bone = -1
+	pump_bone = -1
+	bolt_bone = -1
+	slide_bone = -1
 	if skeleton:
 		var rel := _rel_xform(skeleton, gun)
 		var mb := skeleton.find_bone("Attach_Muzzle")
@@ -264,9 +272,14 @@ func muzzle_global() -> Vector3:
 func animate(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, sprinting: bool) -> void:
 	sprinting_now = sprinting
 	throw_t = maxf(throw_t - delta, 0.0)
+	inspect_t = maxf(inspect_t - delta, 0.0)
+	if blade:
+		blade.visible = weapon == null or gun == null
 	if weapon == null or gun == null:
 		_animate_unarmed(delta, look_delta, speed01, on_floor, sprinting)
 		return
+	if ads > 0.1 or weapon.reloading or sprinting or kick > 0.01:
+		inspect_t = 0.0
 	flash_t -= delta
 	if flash_t <= 0.0:
 		flash.visible = false
@@ -282,7 +295,8 @@ func animate(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, 
 
 	var hip: Vector3 = weapon.data.view_offset
 	var aim: Vector3 = weapon.data.ads_offset
-	aim.y = -scope_local.y - (0.022 if weapon.stats.get("optic", "iron") != "iron" else 0.006)
+	if weapon.data.category != "LAUNCHER":   # launchers aim off-axis from the shoulder
+		aim.y = -scope_local.y - (0.022 if weapon.stats.get("optic", "iron") != "iron" else 0.006)
 	var base := hip.lerp(aim, ads)
 	var pos := base + bob + Vector3(-sway.x, sway.y, kick)
 	var rot := Vector3(deg_to_rad(kick_rot), 0, 0)
@@ -314,6 +328,15 @@ func animate(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, 
 		var m := sin((1.0 - melee_t / 0.3) * PI)
 		pos += Vector3(-0.1 * m, 0.05 * m, -0.15 * m)
 		rot += Vector3(0, deg_to_rad(-35 * m), deg_to_rad(-30 * m))
+	# Inspect: tilt the gun to show its right side, roll over to the left side, then settle back.
+	if inspect_t > 0.0:
+		var ik := 1.0 - inspect_t / INSPECT_TIME
+		var a1 := smoothstep(0.0, 0.25, ik) * (1.0 - smoothstep(0.75, 1.0, ik))
+		var roll := lerpf(1.0, -1.0, smoothstep(0.35, 0.6, ik))
+		pos += Vector3(-0.08, 0.04, 0.06) * a1
+		rot += Vector3(deg_to_rad(10.0), deg_to_rad(-55.0 * roll), deg_to_rad(35.0 * roll)) * a1
+		if mag_bone >= 0 and ik > 0.62 and ik < 0.8:
+			skeleton.set_bone_pose_position(mag_bone, mag_rest + Vector3(0, -0.02 * sin((ik - 0.62) / 0.18 * PI), 0))
 	# Pump / bolt / slide cycling after each shot.
 	var cyc := _cycle_phase()
 	if pump_bone >= 0:
@@ -449,9 +472,71 @@ func _animate_unarmed(delta: float, look_delta: Vector2, speed01: float, on_floo
 		var tp := 1.0 - throw_t / 0.55
 		l = l.lerp(Vector3(-0.05, 0.1, -0.5), sin(tp * PI))
 	var fist := _hand_basis(Vector3(0.0, 0.25, -1.0), Vector3(0.0, 1.0, 0.25))
+	if blade != null:
+		# Melee weapon out: blade held forward in the right hand, slash arcs right-to-left.
+		r = Vector3(0.16, -0.19, -0.36) + bob + low
+		if sprinting:
+			r += Vector3(0, -0.04 + sin(bob_t) * 0.04, 0.05)
+		var hb := _hand_basis(Vector3(-0.1, 0.55, -1.0), Vector3(0.2, 0.3, 0.9))
+		var bb := Basis.from_euler(Vector3(deg_to_rad(-55), deg_to_rad(10), deg_to_rad(-15)))
+		if melee_t > 0.0:
+			var k := 1.0 - melee_t / 0.3
+			var arc := sin(k * PI)
+			r = r.lerp(Vector3(-0.12, -0.12, -0.5), ease(k, 0.6)) + Vector3(0, arc * 0.06, 0)
+			bb = bb.rotated(Vector3.FORWARD, deg_to_rad(70.0 * k)).rotated(Vector3.UP, deg_to_rad(40.0 * arc))
+			inspect_t = 0.0
+		elif inspect_t > 0.0:
+			# Inspect: flip the blade over and back.
+			var ik := 1.0 - inspect_t / INSPECT_TIME
+			r += Vector3(-0.06, 0.05, -0.02) * sin(ik * PI)
+			bb = bb.rotated(Vector3.UP, sin(ik * PI) * PI * 0.9)
+		blade.position = r + Vector3(0.0, 0.01, -0.02)
+		blade.basis = bb.scaled(Vector3.ONE * blade_scale)
+		arms.set_hand("r", r, hb, 0.95)
+		arms.set_hand("l", l + Vector3(-0.02, -0.03, 0.04), fist.rotated(Vector3.FORWARD, deg_to_rad(20)), 1.0)
+		arms.apply(delta)
+		return
 	arms.set_hand("r", r, fist.rotated(Vector3.FORWARD, deg_to_rad(-20)), 1.0)
 	arms.set_hand("l", l, fist.rotated(Vector3.FORWARD, deg_to_rad(20)), 1.0)
 	arms.apply(delta)
+
+
+## Shows (or hides with "") the melee weapon used while holstered.
+func set_melee(id: String) -> void:
+	if id == melee_id:
+		return
+	melee_id = id
+	if blade:
+		blade.queue_free()
+		blade = null
+	var m: Dictionary = GameDB.MELEE.get(id, {})
+	if m.is_empty() or str(m.get("model", "")) == "":
+		if id == "baton":
+			blade = Node3D.new()
+			var mi := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			cm.top_radius = 0.012
+			cm.bottom_radius = 0.016
+			cm.height = 0.5
+			mi.mesh = cm
+			mi.position.y = 0.2
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = Color(0.08, 0.08, 0.09)
+			mi.material_override = mat
+			blade.add_child(mi)
+			blade_scale = 1.0
+			add_child(blade)
+			_cast_off(blade)
+		return
+	blade = load(m.model).instantiate()
+	blade_scale = float(m.get("scale", 0.25))
+	add_child(blade)
+	_cast_off(blade)
+
+
+func inspect() -> void:
+	if switch_t <= 0.0 and melee_t <= 0.0:
+		inspect_t = INSPECT_TIME
 
 
 func is_busy() -> bool:

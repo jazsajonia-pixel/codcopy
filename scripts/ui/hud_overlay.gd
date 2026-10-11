@@ -89,6 +89,14 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, sz), Color(0, 0, 0, sin(scope_k * PI) * 0.85))
 	if scoped:
 		_draw_scope(c, sz, optic_kind if optic_kind in ["3x", "4x"] else "8x", w)
+	# Launcher reticle (no optic on the tube): range ring + drop ticks.
+	if w != null and w.data.category == "LAUNCHER" and player.ads_blend > 0.5 and player.alive:
+		var la := clampf((player.ads_blend - 0.5) * 2.0, 0, 1)
+		var lc := Color(1, 1, 1, 0.85 * la)
+		draw_arc(c, 34.0, 0, TAU, 48, lc, 2.0, true)
+		draw_circle(c, 2.5, Color(1, 0.3, 0.2, la))
+		for i in range(1, 4):
+			draw_line(c + Vector2(-10 + i * 2, 34 + i * 12), c + Vector2(10 - i * 2, 34 + i * 12), lc, 1.5)
 	elif player.alive and w and player.parachute_state != 1 and not player.downed:
 		# Exact cone of the next shot projected to pixels (vertical FOV), smoothed slightly so it
 		# animates; it expands with every shot (bloom) and recovers as the weapon settles.

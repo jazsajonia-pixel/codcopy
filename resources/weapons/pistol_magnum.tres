@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "pistol_magnum"
+display_name = "Magnum .357"
+category = "PISTOL"
+description = "Six-shot revolver. Two-shot kill up close, headshots hurt."
+model_path = "res://assets/weapons/launchers/magnum.tscn"
+fire_mode = 1
+damage = 55.0
+headshot_multiplier = 1.8
+effective_range = 20.0
+max_range = 60.0
+falloff_multiplier = 0.65
+fire_rate_rpm = 160.0
+mag_size = 6
+reserve_ammo = 36
+reload_time = 2.4
+reload_empty_time = 2.4
+ads_time = 0.16
+move_speed_multiplier = 1.08
+ads_fov = 68.0
+hip_spread_deg = 2.2
+ads_spread_deg = 0.2
+move_spread_deg = 1.0
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 3.0
+recoil_horizontal = 0.6
+recoil_recovery = 7.0
+fire_sound = "res://assets/audio/weapons/sniper_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_pistol.ogg"
+ammo_type = "pistol"
+view_offset = Vector3(0.14, -0.14, -0.31)
+ads_offset = Vector3(0.0, -0.075, -0.25)
+unlock_level = 16
+allowed_attachments = { "muzzle": ["compensator"] }

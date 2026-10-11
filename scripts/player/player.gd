@@ -121,6 +121,7 @@ func _ready() -> void:
 
 func equip_current() -> void:
 	view_model.set_weapon(inv.active())
+	view_model.set_melee(inv.melee if MatchConfig.mode != "br" else "")
 	if body:
 		body.set_weapon(inv.active())
 		body.set_shadow_only(_body_shadow_only)
@@ -162,11 +163,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("switch_weapon"): input.switch_weapon = true
 	elif event.is_action_pressed("slot_1"): input.select_slot = 0
 	elif event.is_action_pressed("slot_2"): input.select_slot = 1
-	elif event.is_action_pressed("slot_3"):
-		if MatchConfig.mode == "br":
-			input.select_slot = 2
-		else:
-			input.melee = true
+	elif event.is_action_pressed("slot_3"): input.select_slot = 2
+	elif event.is_action_pressed("inspect"): input.inspect = true
 	elif event.is_action_pressed("toggle_view"): input.toggle_view = true
 	elif event.is_action_pressed("lethal"): input.lethal = true
 	elif event.is_action_pressed("tactical"): input.tactical = true
@@ -386,8 +384,11 @@ func _handle_actions() -> void:
 	if SaveManager.get_setting("controls", "ads_mode", "toggle") == "hold" and not touch_mode:
 		ads_on = input.ads_held
 	if input.melee:
-		do_melee(camera.global_position, look_dir())
+		if do_melee(camera.global_position, look_dir()) and body:
+			body.play_melee()
 		view_model.on_melee()
+	if input.inspect:
+		view_model.inspect()
 	if input.lethal and throw_equipment("lethal", camera.global_position, look_dir()):
 		view_model.on_throw()
 	if input.tactical and throw_equipment("tactical", camera.global_position, look_dir()):

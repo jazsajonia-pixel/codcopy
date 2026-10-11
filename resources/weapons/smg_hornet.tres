@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "smg_hornet"
+display_name = "Hornet"
+category = "SMG"
+description = "Fast-firing 9mm with a big drum. Stable for an SMG."
+model_path = "res://assets/weapons/guns/SMG_Full_East.glb"
+fire_mode = 0
+damage = 20.0
+headshot_multiplier = 1.4
+effective_range = 14.0
+max_range = 50.0
+falloff_multiplier = 0.6
+fire_rate_rpm = 880.0
+mag_size = 40
+reserve_ammo = 160
+reload_time = 2.2
+reload_empty_time = 2.7
+ads_time = 0.17
+move_speed_multiplier = 1.05
+ads_fov = 64.0
+hip_spread_deg = 2.6
+ads_spread_deg = 0.6
+move_spread_deg = 1.0
+spread_per_shot_deg = 0.15
+max_bloom_deg = 2.2
+recoil_vertical = 0.55
+recoil_horizontal = 0.35
+recoil_recovery = 11.0
+fire_sound = "res://assets/audio/weapons/smg_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "smg"
+view_offset = Vector3(0.16, -0.16, -0.33)
+ads_offset = Vector3(0.0, -0.07, -0.23)
+unlock_level = 3
+allowed_attachments = { "optic": ["red_dot", "holo"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "grip": ["vertical_grip", "angled_grip"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

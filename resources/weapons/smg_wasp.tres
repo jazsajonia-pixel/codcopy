@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "smg_wasp"
+display_name = "Wasp-9"
+category = "SMG"
+description = "Tiny machine pistol frame. Melts up close, sprays at range."
+model_path = "res://assets/weapons/guns/SMG_Compact_East.glb"
+fire_mode = 0
+damage = 17.0
+headshot_multiplier = 1.3
+effective_range = 9.0
+max_range = 35.0
+falloff_multiplier = 0.55
+fire_rate_rpm = 1150.0
+mag_size = 32
+reserve_ammo = 160
+reload_time = 1.8
+reload_empty_time = 2.2
+ads_time = 0.14
+move_speed_multiplier = 1.08
+ads_fov = 66.0
+hip_spread_deg = 2.2
+ads_spread_deg = 0.9
+move_spread_deg = 0.8
+spread_per_shot_deg = 0.2
+max_bloom_deg = 2.6
+recoil_vertical = 0.5
+recoil_horizontal = 0.5
+recoil_recovery = 12.0
+fire_sound = "res://assets/audio/weapons/smg_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "smg"
+view_offset = Vector3(0.15, -0.15, -0.31)
+ads_offset = Vector3(0.0, -0.065, -0.22)
+unlock_level = 12
+allowed_attachments = { "optic": ["red_dot", "holo"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "grip": ["vertical_grip", "angled_grip"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

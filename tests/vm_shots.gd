@@ -29,6 +29,16 @@ func _ready() -> void:
 	vm = ViewModel.new()
 	cam.add_child(vm)
 	var ids := ["ar_m4k", "pistol_p9", "sg_breacher", "sniper_ls7", "smg_vx"]
+	var only := OS.get_environment("VM_ONLY")
+	if only != "":
+		for id in only.split(","):
+			for st in ["hip", "ads"]:
+				jobs.append([id, st])
+		jobs.append(["", "knife"])
+		jobs.append(["", "knife_slash"])
+		jobs.append(["ar_m4k", "inspect"])
+		_run.call_deferred()
+		return
 	for id in ids:
 		jobs.append([id, "hip"])
 	for st in ["ads", "reload_a", "reload_b", "sprint", "cycle", "throw", "heal", "melee"]:
@@ -46,11 +56,12 @@ func _run() -> void:
 		var st: String = j[1]
 		var w: WeaponInstance = WeaponInstance.create(id) if id != "" else null
 		vm.set_weapon(w)
+		vm.set_melee("knife" if st.begins_with("knife") else "")
 		vm.switch_t = 0.0
 		vm.ads = 0.0
 		vm.use_item = ""
 		var sprint := st == "sprint"
-		var frames := 40
+		var frames := 40 if st != "inspect" else 50
 		for f in frames:
 			if w:
 				if st == "ads": vm.ads = 1.0
@@ -63,7 +74,8 @@ func _run() -> void:
 				if st == "heal":
 					vm.use_item = "medkit"
 			if st == "throw" and f == frames - 14: vm.on_throw()
-			if (st == "melee" or st == "punch") and f == frames - 6: vm.on_melee()
+			if (st == "melee" or st == "punch" or st == "knife_slash") and f == frames - 6: vm.on_melee()
+			if st == "inspect" and f == 4: vm.inspect()
 			vm.animate(1.0 / 60.0, Vector2.ZERO, 1.0 if sprint else 0.0, true, sprint)
 			await get_tree().process_frame
 		await RenderingServer.frame_post_draw

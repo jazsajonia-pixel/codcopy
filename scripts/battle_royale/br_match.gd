@@ -93,7 +93,9 @@ func _spawn_vehicles() -> void:
 
 
 func _spawn_loot() -> void:
-	var weapons := GameDB.weapons.keys()
+	# Launchers are rare (crates + a small share of floor loot).
+	var weapons := GameDB.weapons.keys().filter(func(id): return GameDB.weapons[id].category != "LAUNCHER")
+	var launchers := GameDB.weapons.keys().filter(func(id): return GameDB.weapons[id].category == "LAUNCHER")
 	var weights := {"weapon": 34, "ammo": 24, "armor": 9, "heal": 17, "plate": 9, "grenade": 7}
 	var i := 0
 	for p in map.loot_points:
@@ -106,7 +108,8 @@ func _spawn_loot() -> void:
 		var l: LootItem
 		match kind:
 			"weapon":
-				l = LootItem.make("weapon", weapons[rng.randi() % weapons.size()])
+				var pool: Array = launchers if rng.randf() < 0.05 and launchers.size() > 0 else weapons
+				l = LootItem.make("weapon", pool[rng.randi() % pool.size()])
 				if rng.randf() < 0.3:
 					l.weapon_attachments = {"optic": "red_dot"}
 			"ammo":
@@ -131,8 +134,11 @@ func _spawn_loot() -> void:
 			la.global_position = p + Vector3(0.9, 0, 0.4)
 	for c in map.crate_points:
 		var crate := SupplyCrate.new()
-		var best: String = ["ar_k47", "lmg_rpv", "sniper_ls7", "dmr_skr", "sg_tempest", "smg_kr"][rng.randi() % 6]
-		crate.contents = [["weapon", best, 1, {"optic": "holo" if best != "sniper_ls7" else "scope_8x", "magazine": "extended_mag"}],
+		var bests := ["ar_k47", "lmg_rpv", "sniper_ls7", "dmr_skr", "sg_tempest", "smg_kr", "sniper_anvil", "ar_ironclad", "launcher_viper", "sg_striker"]
+		var best: String = bests[rng.randi() % bests.size()]
+		var bw := GameDB.get_weapon(best)
+		var att := {} if bw.category == "LAUNCHER" else {"optic": "scope_8x" if bw.category == "SNIPER" else "holo", "magazine": "extended_mag"}
+		crate.contents = [["weapon", best, 1, att],
 			["armor", "armor_3", 1], ["heal", "medkit", 2], ["plate", "plate", 2], ["ammo", "ammo_" + GameDB.get_weapon(best).ammo_type, 60]]
 		add_child(crate)
 		crate.global_position = c

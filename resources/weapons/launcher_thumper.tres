@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "launcher_thumper"
+display_name = "Thumper GL"
+category = "LAUNCHER"
+description = "Six-round grenade launcher. Lobbed shots bounce once, then blow."
+model_path = "res://assets/weapons/launchers/thumper_gl.tscn"
+fire_mode = 1
+damage = 110.0
+headshot_multiplier = 1.0
+effective_range = 5.0
+max_range = 120.0
+falloff_multiplier = 1.0
+fire_rate_rpm = 110.0
+mag_size = 6
+reserve_ammo = 6
+reload_time = 3.6
+reload_empty_time = 3.6
+ads_time = 0.3
+move_speed_multiplier = 0.9
+ads_fov = 55.0
+hip_spread_deg = 2.5
+ads_spread_deg = 0.0
+move_spread_deg = 1.5
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 3.5
+recoil_horizontal = 0.5
+recoil_recovery = 5.0
+fire_sound = "res://assets/audio/weapons/shotgun_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "rocket"
+view_offset = Vector3(0.2, -0.18, -0.38)
+ads_offset = Vector3(0.11, -0.13, -0.32)
+unlock_level = 24
+allowed_attachments = {}

@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "ar_ironclad"
+display_name = "Ironclad BR"
+category = "AR"
+description = "3-round burst battle rifle. Two bursts to the chest."
+model_path = "res://assets/weapons/guns/Rifle_Battle_West.glb"
+fire_mode = 4
+burst_count = 3
+damage = 31.0
+headshot_multiplier = 1.5
+effective_range = 45.0
+max_range = 150.0
+falloff_multiplier = 0.7
+fire_rate_rpm = 900.0
+mag_size = 24
+reserve_ammo = 120
+reload_time = 2.3
+reload_empty_time = 2.9
+ads_time = 0.26
+move_speed_multiplier = 0.94
+ads_fov = 56.0
+hip_spread_deg = 3.4
+ads_spread_deg = 0.25
+move_spread_deg = 2.0
+spread_per_shot_deg = 0.2
+max_bloom_deg = 2.0
+recoil_vertical = 1.0
+recoil_horizontal = 0.3
+recoil_recovery = 9.0
+fire_sound = "res://assets/audio/weapons/ar_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "rifle"
+view_offset = Vector3(0.17, -0.165, -0.37)
+ads_offset = Vector3(0.0, -0.08, -0.27)
+unlock_level = 7
+allowed_attachments = { "optic": ["red_dot", "holo", "scope_3x", "scope_4x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "grip": ["vertical_grip", "angled_grip"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

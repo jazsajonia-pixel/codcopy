@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sniper_titan"
+display_name = "Titan SA"
+category = "SNIPER"
+description = "Semi-auto anti-materiel rifle. Fast follow-ups, two-shot kill."
+model_path = "res://assets/weapons/guns/Sniper_Material_East.glb"
+fire_mode = 1
+damage = 80.0
+headshot_multiplier = 1.6
+effective_range = 110.0
+max_range = 300.0
+falloff_multiplier = 0.85
+fire_rate_rpm = 150.0
+mag_size = 8
+reserve_ammo = 32
+reload_time = 3.0
+reload_empty_time = 3.6
+ads_time = 0.4
+move_speed_multiplier = 0.86
+ads_fov = 22.0
+scope_overlay = true
+hip_spread_deg = 8.0
+ads_spread_deg = 0.0
+move_spread_deg = 6.0
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 2.8
+recoil_horizontal = 0.6
+recoil_recovery = 6.0
+fire_sound = "res://assets/audio/weapons/sniper_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "sniper"
+view_offset = Vector3(0.18, -0.16, -0.44)
+ads_offset = Vector3(0.0, -0.075, -0.32)
+unlock_level = 20
+allowed_attachments = { "optic": ["scope_4x", "scope_8x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

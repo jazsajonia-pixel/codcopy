@@ -12,6 +12,8 @@ const ATTACHMENTS := {
 		"mods": {"ads_fov": ["mul", 0.95], "ads_time": ["add", 0.01]}, "desc": "Clean 1x reflex sight."},
 	"holo": {"slot": "optic", "name": "Holographic Sight", "optic": "holo", "unlock": 3,
 		"mods": {"ads_fov": ["mul", 0.9], "ads_time": ["add", 0.02]}, "desc": "Wide 1.5x holographic window."},
+	"scope_3x": {"slot": "optic", "name": "3x Tactical Scope", "optic": "3x", "unlock": 4,
+		"mods": {"ads_fov": ["set", 40.0], "ads_time": ["add", 0.04]}, "desc": "Low magnification, wide eyepiece."},
 	"scope_4x": {"slot": "optic", "name": "4x Tactical Scope", "optic": "4x", "unlock": 5,
 		"mods": {"ads_fov": ["set", 32.0], "ads_time": ["add", 0.06]}, "desc": "Mid-range magnified optic."},
 	"scope_8x": {"slot": "optic", "name": "8x Sniper Scope", "optic": "8x", "unlock": 7,
@@ -42,10 +44,16 @@ const ATTACHMENTS := {
 
 const SLOTS := ["optic", "muzzle", "barrel", "grip", "magazine", "stock"]
 
+## Melee weapons. model/scale: Toon Shooter CC0 meshes (blade along +Y, handle at the origin).
 const MELEE := {
-	"knife": {"name": "Combat Knife", "damage": 100.0, "range": 2.2, "cooldown": 0.6, "unlock": 1},
-	"hatchet": {"name": "Field Hatchet", "damage": 100.0, "range": 2.6, "cooldown": 0.85, "unlock": 2},
-	"baton": {"name": "Tactical Baton", "damage": 70.0, "range": 2.4, "cooldown": 0.45, "unlock": 6},
+	"knife": {"name": "Combat Knife", "short": "KNIFE", "damage": 100.0, "range": 2.2, "cooldown": 0.6, "unlock": 1,
+		"model": "res://assets/weapons/melee/Knife_1.gltf", "scale": 0.22, "desc": "Fast one-hit stab."},
+	"hatchet": {"name": "Field Hatchet", "short": "HATCHET", "damage": 100.0, "range": 2.6, "cooldown": 0.85, "unlock": 2,
+		"model": "res://assets/weapons/melee/Knife_2.gltf", "scale": 0.28, "desc": "Longer reach, slower swing."},
+	"baton": {"name": "Tactical Baton", "short": "BATON", "damage": 70.0, "range": 2.4, "cooldown": 0.45, "unlock": 6,
+		"model": "", "scale": 1.0, "desc": "Two quick hits, fastest recovery."},
+	"machete": {"name": "Machete", "short": "MACHETE", "damage": 100.0, "range": 2.9, "cooldown": 0.9, "unlock": 10,
+		"model": "res://assets/weapons/melee/Shovel.gltf", "scale": 0.5, "desc": "Longest reach of any blade."},
 }
 
 const EQUIPMENT := {
@@ -98,6 +106,7 @@ const BR_ITEMS := {
 	"ammo_shotgun": {"name": "Shotgun Shells", "kind": "ammo", "ammo": "shotgun", "amount": 16},
 	"ammo_sniper": {"name": "Sniper Ammo", "kind": "ammo", "ammo": "sniper", "amount": 15},
 	"ammo_pistol": {"name": "Pistol Ammo", "kind": "ammo", "ammo": "pistol", "amount": 40},
+	"ammo_rocket": {"name": "Rockets", "kind": "ammo", "ammo": "rocket", "amount": 2},
 	"armor_1": {"name": "Light Vest", "kind": "armor", "armor": 50.0, "tier": 1},
 	"armor_2": {"name": "Tactical Vest", "kind": "armor", "armor": 100.0, "tier": 2},
 	"armor_3": {"name": "Heavy Plate Carrier", "kind": "armor", "armor": 150.0, "tier": 3},
@@ -145,7 +154,7 @@ func weapon_ids_for_slot(slot: String) -> Array:
 	var out: Array = []
 	for id in weapons.keys():
 		var cat: String = weapons[id].category
-		if (slot == "primary" and cat != "PISTOL") or (slot == "secondary" and cat in SECONDARY_CATEGORIES):
+		if (slot == "primary" and cat != "PISTOL" and cat != "LAUNCHER") or (slot == "secondary" and cat in SECONDARY_CATEGORIES):
 			out.append(id)
 	out.sort_custom(func(a, b): return weapons[a].unlock_level < weapons[b].unlock_level or (weapons[a].unlock_level == weapons[b].unlock_level and a < b))
 	return out

@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "pistol_tokar"
+display_name = "Tokar .45"
+category = "PISTOL"
+description = "Heavy single-action pistol. Three to the chest."
+model_path = "res://assets/weapons/guns/Pistol_Full_East.glb"
+fire_mode = 1
+damage = 38.0
+headshot_multiplier = 1.6
+effective_range = 16.0
+max_range = 55.0
+falloff_multiplier = 0.6
+fire_rate_rpm = 300.0
+mag_size = 8
+reserve_ammo = 48
+reload_time = 1.6
+reload_empty_time = 2.0
+ads_time = 0.14
+move_speed_multiplier = 1.1
+ads_fov = 70.0
+hip_spread_deg = 1.8
+ads_spread_deg = 0.3
+move_spread_deg = 0.8
+spread_per_shot_deg = 0.4
+max_bloom_deg = 1.6
+recoil_vertical = 1.5
+recoil_horizontal = 0.3
+recoil_recovery = 9.0
+fire_sound = "res://assets/audio/weapons/pistol_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_pistol.ogg"
+ammo_type = "pistol"
+view_offset = Vector3(0.14, -0.14, -0.31)
+ads_offset = Vector3(0.0, -0.083, -0.25)
+unlock_level = 9
+allowed_attachments = { "optic": ["red_dot"], "muzzle": ["suppressor", "compensator", "flash_guard"], "magazine": ["extended_mag", "fast_mag"] }

@@ -23,6 +23,7 @@ var heal := false
 var plate := false
 var touch_sprint := false       ## joystick pushed fully forward (auto sprint)
 var select_slot := -1           ## weapon bar / number keys: 0, 1 = weapon slots, 2 = fists/melee
+var inspect := false
 var toggle_view := false        ## BR: switch first/third person
 
 
@@ -32,6 +33,7 @@ func clear_pressed() -> void:
 	jump = false
 	select_slot = -1
 	toggle_view = false
+	inspect = false
 	crouch = false
 	sprint_toggle = false
 	reload = false

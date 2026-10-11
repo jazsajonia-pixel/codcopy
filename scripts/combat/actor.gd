@@ -370,7 +370,12 @@ func process_trigger(trigger: bool, origin: Vector3, dir: Vector3, muzzle: Vecto
 			_on_reload_started(w)
 		return {}
 	var spread := spread_override if spread_override >= 0.0 else w.spread_deg(ads, moving, not is_on_floor())
-	var res := Combat.fire_hitscan(self, origin, dir, w, spread, muzzle, true)
+	var res := {}
+	if w.data.category == "LAUNCHER":
+		res = {"hits": 0, "kills": 0, "headshot": false, "damage": 0.0}
+		Projectile.launch(self, w, muzzle, Combat.cone(dir, spread))
+	else:
+		res = Combat.fire_hitscan(self, origin, dir, w, spread, muzzle, true)
 	var loud: bool = not w.stats.suppressed
 	AudioManager.play_3d(w.data.fire_sound, muzzle, -2.0 if loud else -16.0, randf_range(0.95, 1.05), 160.0 if loud else 30.0)
 	shot_fired.emit(self, not loud)

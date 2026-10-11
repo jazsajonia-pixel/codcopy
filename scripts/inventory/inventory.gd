@@ -6,13 +6,13 @@ extends RefCounted
 signal changed
 
 const MAX_WEAPONS := 2
-const MAX_AMMO := {"rifle": 240, "smg": 280, "shotgun": 48, "sniper": 40, "pistol": 150}
+const MAX_AMMO := {"rifle": 240, "smg": 280, "shotgun": 48, "sniper": 40, "pistol": 150, "rocket": 8}
 
 var weapons: Array = [null, null] ## WeaponInstance per slot
 var current := 0
 var holstered := false            ## fists / melee out (player weapon bar); active() returns null
 var use_ammo_pools := false
-var ammo := {"rifle": 0, "smg": 0, "shotgun": 0, "sniper": 0, "pistol": 0}
+var ammo := {"rifle": 0, "smg": 0, "shotgun": 0, "sniper": 0, "pistol": 0, "rocket": 0}
 var lethal := ""
 var lethal_count := 0
 var tactical := ""

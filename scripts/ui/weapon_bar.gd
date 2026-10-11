@@ -74,7 +74,11 @@ func _activate(id: String) -> void:
 		"slot0": inp.select_slot = 0
 		"slot1": inp.select_slot = 1
 		"fists": inp.select_slot = 2
-		"weapon": inp.select_slot = 0
+		"weapon":
+			if player.inv.holstered:
+				inp.select_slot = 0
+			else:
+				inp.inspect = true   # tap the active gun card to inspect it
 		"knife":
 			if player.inv.holstered:
 				inp.melee = true

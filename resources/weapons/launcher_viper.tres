@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "launcher_viper"
+display_name = "Viper RL"
+category = "LAUNCHER"
+description = "Unguided rocket launcher. Huge splash, best against vehicles."
+model_path = "res://assets/weapons/launchers/viper_rl.tscn"
+fire_mode = 1
+damage = 160.0
+headshot_multiplier = 1.0
+effective_range = 6.0
+max_range = 200.0
+falloff_multiplier = 1.0
+fire_rate_rpm = 50.0
+mag_size = 1
+reserve_ammo = 4
+reload_time = 3.0
+reload_empty_time = 3.0
+ads_time = 0.35
+move_speed_multiplier = 0.88
+ads_fov = 50.0
+hip_spread_deg = 2.0
+ads_spread_deg = 0.0
+move_spread_deg = 1.5
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 5.0
+recoil_horizontal = 0.5
+recoil_recovery = 4.0
+fire_sound = "res://assets/audio/weapons/shotgun_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "rocket"
+view_offset = Vector3(0.28, -0.25, -0.5)
+ads_offset = Vector3(0.2, -0.2, -0.45)
+unlock_level = 22
+allowed_attachments = {}

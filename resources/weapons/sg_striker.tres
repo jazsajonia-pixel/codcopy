@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sg_striker"
+display_name = "Striker AA"
+category = "SHOTGUN"
+description = "Fully automatic drum shotgun. Brutal in corridors."
+model_path = "res://assets/weapons/guns/Shotgun_Auto_West.glb"
+fire_mode = 0
+damage = 10.0
+headshot_multiplier = 1.2
+pellets = 7
+effective_range = 6.0
+max_range = 18.0
+falloff_multiplier = 0.2
+fire_rate_rpm = 300.0
+mag_size = 10
+reserve_ammo = 40
+reload_time = 3.0
+reload_empty_time = 3.4
+ads_time = 0.24
+move_speed_multiplier = 0.95
+ads_fov = 66.0
+hip_spread_deg = 6.5
+ads_spread_deg = 5.0
+move_spread_deg = 1.0
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 1.6
+recoil_horizontal = 0.7
+recoil_recovery = 8.0
+fire_sound = "res://assets/audio/weapons/shotgun_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "shotgun"
+view_offset = Vector3(0.17, -0.15, -0.37)
+ads_offset = Vector3(0.0, -0.09, -0.27)
+unlock_level = 18
+allowed_attachments = { "optic": ["red_dot", "holo"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

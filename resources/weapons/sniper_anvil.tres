@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://scripts/weapons/weapon_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "sniper_anvil"
+display_name = "Anvil .50"
+category = "SNIPER"
+description = "Anti-materiel bolt rifle. Kills anywhere above the waist, wrecks vehicles."
+model_path = "res://assets/weapons/guns/Sniper_Material_West.glb"
+fire_mode = 2
+damage = 150.0
+headshot_multiplier = 1.5
+effective_range = 150.0
+max_range = 400.0
+falloff_multiplier = 0.9
+fire_rate_rpm = 38.0
+mag_size = 5
+reserve_ammo = 20
+reload_time = 3.4
+reload_empty_time = 4.0
+ads_time = 0.45
+move_speed_multiplier = 0.85
+ads_fov = 20.0
+scope_overlay = true
+hip_spread_deg = 9.0
+ads_spread_deg = 0.0
+move_spread_deg = 7.0
+spread_per_shot_deg = 0.0
+max_bloom_deg = 0.0
+recoil_vertical = 4.0
+recoil_horizontal = 0.6
+recoil_recovery = 4.5
+fire_sound = "res://assets/audio/weapons/sniper_shot.ogg"
+reload_sound = "res://assets/audio/weapons/reload_rifle.ogg"
+ammo_type = "sniper"
+view_offset = Vector3(0.18, -0.16, -0.44)
+ads_offset = Vector3(0.0, -0.075, -0.32)
+unlock_level = 15
+allowed_attachments = { "optic": ["scope_4x", "scope_8x"], "muzzle": ["suppressor", "compensator", "flash_guard"], "barrel": ["long_barrel", "short_barrel"], "magazine": ["extended_mag", "fast_mag"], "stock": ["tactical_stock", "no_stock"] }

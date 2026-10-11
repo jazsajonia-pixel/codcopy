@@ -21,6 +21,7 @@ const KEYS := {
 	"lethal": [KEY_G],
 	"tactical": [KEY_T],
 	"melee": [KEY_V],
+	"inspect": [KEY_Y],
 	"interact": [KEY_F, KEY_E],
 	"heal": [KEY_H],
 	"plate": [KEY_X],
@@ -45,6 +46,7 @@ const PAD := {
 	"pause": JOY_BUTTON_START,
 	"interact": JOY_BUTTON_DPAD_UP,
 	"heal": JOY_BUTTON_DPAD_DOWN,
+	"inspect": JOY_BUTTON_DPAD_LEFT,
 }
 
 
