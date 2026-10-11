@@ -17,17 +17,21 @@ const DEFAULTS := {
 	"jump": {"x": 0.93, "y": 0.84, "size": 80.0, "label": "JUMP"},
 	"crouch": {"x": 0.80, "y": 0.88, "size": 76.0, "label": "CROUCH"},
 	"reload": {"x": 0.74, "y": 0.70, "size": 66.0, "label": "RELOAD"},
-	"switch": {"x": 0.68, "y": 0.86, "size": 70.0, "label": "SWAP"},
+	"switch": {"x": 0.68, "y": 0.86, "size": 70.0, "label": "SWAP", "hidden": true},
 	"lethal": {"x": 0.71, "y": 0.50, "size": 62.0, "label": "FRAG"},
 	"tactical": {"x": 0.78, "y": 0.38, "size": 62.0, "label": "TACT"},
-	"melee": {"x": 0.66, "y": 0.62, "size": 58.0, "label": "KNIFE"},
+	"melee": {"x": 0.66, "y": 0.62, "size": 58.0, "label": "KNIFE", "hidden": true},
 	"interact": {"x": 0.57, "y": 0.66, "size": 76.0, "label": "PICK"},
 	"heal": {"x": 0.30, "y": 0.08, "size": 64.0, "label": "HEAL", "br_only": true},
 	"plate": {"x": 0.36, "y": 0.08, "size": 60.0, "label": "PLATE", "br_only": true},
 	"sprint": {"x": 0.15, "y": 0.40, "size": 64.0, "label": "SPRINT"},
 	"score": {"x": 0.62, "y": 0.06, "size": 52.0, "label": "TAB"},
 	"pause": {"x": 0.68, "y": 0.06, "size": 52.0, "label": "II"},
+	"bag": {"x": 0.27, "y": 0.93, "size": 58.0, "label": "BAG", "br_only": true},
+	"view": {"x": 0.74, "y": 0.06, "size": 52.0, "label": "VIEW", "br_only": true},
 }
+## SWAP and KNIFE start hidden: the weapon bar at the bottom does both (they can be re-enabled
+## in the HUD layout editor).
 
 const MOUSE_FINGER := 99
 
@@ -45,6 +49,8 @@ var _interact_available := false
 var _font: Font
 var on_pause: Callable
 var on_score: Callable
+var on_bag: Callable
+var weapon_bar: WeaponBar
 
 
 func _ready() -> void:
@@ -63,7 +69,7 @@ func load_layout() -> void:
 	for id in DEFAULTS.keys():
 		var d: Dictionary = DEFAULTS[id].duplicate()
 		d.opacity = g_op
-		d.visible = true
+		d.visible = not d.get("hidden", false)
 		d.size = d.size * g_size
 		if saved.has(id):
 			for k in ["x", "y", "size", "opacity", "visible"]:
@@ -191,6 +197,9 @@ func _touch_down(idx: int, p: Vector2) -> void:
 		_fingers[idx] = {"kind": "btn", "id": id}
 		_press(id)
 		return
+	if weapon_bar and not driving and weapon_bar.tap(p):
+		_fingers[idx] = {"kind": "bar"}
+		return
 	var s := _safe()
 	if p.x < s.position.x + s.size.x * 0.42 and p.y > s.position.y + s.size.y * 0.3:
 		_fingers[idx] = {"kind": "joy"}
@@ -276,6 +285,9 @@ func _press(id: String) -> void:
 		"heal": inp.heal = true
 		"plate": inp.plate = true
 		"sprint": inp.sprint_toggle = true
+		"view": inp.toggle_view = true
+		"bag":
+			if on_bag.is_valid(): on_bag.call()
 		"pause":
 			if on_pause.is_valid(): on_pause.call()
 		"score":
@@ -313,7 +325,13 @@ func _process(_d: float) -> void:
 		queue_redraw()
 
 
+var _ads_fade := 1.0
+
+
 func _draw() -> void:
+	# While aiming, everything except FIRE / ADS fades out so the sight is clear (CODM style).
+	var aiming := player != null and player.ads_blend > 0.5 and not edit_mode
+	_ads_fade = lerpf(_ads_fade, 0.3 if aiming else 1.0, 0.25)
 	for id in layout.keys():
 		var d: Dictionary = layout[id]
 		if not d.visible and not edit_mode:
@@ -322,6 +340,8 @@ func _draw() -> void:
 			if not edit_mode:
 				continue
 		var op: float = d.opacity * (0.35 if edit_mode and not d.visible else 1.0)
+		if not id in ["fire", "fire_left", "ads"]:
+			op *= _ads_fade
 		var c := _pos(id)
 		var r := _radius(id)
 		if id == "joystick":
@@ -351,6 +371,12 @@ func _draw() -> void:
 					label = "PLATE %d" % player.inv.plates
 				elif id == "ads" and player.ads_on:
 					label = "ADS*"
+				elif id == "jump" and player.parachute_state == 1:
+					label = "CHUTE"
+				elif id == "jump" and player.parachute_state == 2:
+					label = "CUT" if player.agl > Player.CHUTE_MIN_CUT_AGL else "CHUTE"
+				elif id == "view":
+					label = "FPP" if player.wants_tpp() else "TPP"
 			_text(c, label, clampi(int(r * 0.34), 11, 24), Color(1, 1, 1, minf(op + 0.2, 1.0)))
 		if edit_mode and id == selected:
 			draw_arc(c, r + 6, 0, TAU, 48, UITheme.ACCENT, 3.0, true)

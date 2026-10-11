@@ -8,6 +8,9 @@ var root: Control
 var overlay: HudOverlay
 var touch: TouchControls
 var minimap: Minimap
+var weapon_bar: WeaponBar
+var drop_label: Label         ## BR drop: altitude / speed / chute hint
+var bag: BagPanel
 var bigmap: Minimap
 var score_box: HBoxContainer
 var score_a: Label
@@ -60,6 +63,7 @@ func _ready() -> void:
 	_build_scoreboard()
 	_build_bigmap()
 	player.hit_confirmed.connect(overlay.on_hit)
+	player.damage_dealt.connect(overlay.on_damage_dealt)
 	player.damaged.connect(func(_a, from, _att): overlay.on_damaged(from))
 	player.interact_target_changed.connect(_on_interact_target)
 	player.vehicle_changed.connect(_on_vehicle_changed)
@@ -134,12 +138,18 @@ func _build_bottom() -> void:
 	root.add_child(armor_bar)
 	health_label = UITheme.shadowed(UITheme.label("100", 18))
 	root.add_child(health_label)
+	# Weapon name and ammo are shown on the weapon bar; these labels stay as hidden fallbacks.
 	weapon_label = UITheme.shadowed(UITheme.label("", 20, UITheme.TEXT, HORIZONTAL_ALIGNMENT_RIGHT))
+	weapon_label.visible = false
 	root.add_child(weapon_label)
 	ammo_label = UITheme.shadowed(UITheme.label("", 34, UITheme.TEXT, HORIZONTAL_ALIGNMENT_RIGHT))
+	ammo_label.visible = false
 	root.add_child(ammo_label)
 	equip_label = UITheme.shadowed(UITheme.label("", 16, UITheme.MUTED, HORIZONTAL_ALIGNMENT_RIGHT))
 	root.add_child(equip_label)
+	drop_label = UITheme.shadowed(UITheme.label("", 20, UITheme.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+	drop_label.visible = false
+	root.add_child(drop_label)
 	hint_label = UITheme.shadowed(UITheme.label("", 15, UITheme.MUTED))
 	root.add_child(hint_label)
 	flags_label = RichTextLabel.new()
@@ -191,11 +201,23 @@ func _build_touch() -> void:
 	touch.br_mode = MatchConfig.mode == "br"
 	touch.on_pause = func(): match_node.toggle_pause()
 	touch.on_score = func(show: bool): scoreboard_panel.visible = show
+	touch.on_bag = toggle_bag
+	weapon_bar = WeaponBar.new()
+	weapon_bar.player = player
+	weapon_bar.br_mode = MatchConfig.mode == "br"
+	root.add_child(weapon_bar)
+	touch.weapon_bar = weapon_bar
+	bag = BagPanel.new()
+	bag.player = player
+	bag.visible = false
+	bag.closed.connect(_on_bag_closed)
 	root.add_child(touch)
+	root.add_child(bag)
 	var scheme: String = SaveManager.get_setting("controls", "scheme", "auto")
 	var use_touch := scheme == "touch" or (scheme != "keyboard" and (DisplayServer.is_touchscreen_available() or is_mobile()))
 	touch.visible = use_touch
 	player.touch_mode = use_touch
+	weapon_bar.touch = use_touch
 	if not use_touch and not MatchConfig.autoplay_player and DisplayServer.get_name() != "headless":
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -281,7 +303,9 @@ func _layout() -> void:
 	squad_label.position = s.position + Vector2(18, mm + 42)
 	squad_label.size = Vector2(150, 80)
 	var bw := clampf(s.size.x * 0.24, 220, 360)
-	health_bar.position = Vector2(s.position.x + s.size.x * 0.5 - bw * 0.5, s.end.y - 46)
+	# Health / armor sit just above the weapon bar (bottom centre), like CODM.
+	var bar_top := s.end.y - 10.0 - WeaponBar.CARD.y * (float(SaveManager.get_setting("accessibility", "hud_scale", 1.0)) if player.touch_mode else 0.9)
+	health_bar.position = Vector2(s.position.x + s.size.x * 0.5 - bw * 0.5, bar_top - 22)
 	health_bar.size = Vector2(bw, 14)
 	armor_bar.position = health_bar.position + Vector2(0, -12)
 	armor_bar.size = Vector2(bw, 8)
@@ -298,14 +322,20 @@ func _layout() -> void:
 		for l in [weapon_label, ammo_label, equip_label]:
 			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			l.position.x = s.position.x + s.size.x * 0.5 - 200
-		weapon_label.position.y = s.end.y - 178
-		ammo_label.position.y = s.end.y - 150
-		equip_label.position.y = s.end.y - 108
-	hint_label.position = Vector2(s.position.x + 20, s.end.y - 30)
-	hint_label.size = Vector2(700, 24)
+		weapon_label.position.y = bar_top - 120
+		ammo_label.position.y = bar_top - 96
+		equip_label.position.y = bar_top - 64
+	# Keyboard hint: bottom-left, wrapped so it stays clear of the weapon bar.
+	var hint_w := maxf(s.size.x * 0.5 - 270.0 - 30.0, 200.0)
+	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint_label.position = Vector2(s.position.x + 20, s.end.y - 74)
+	hint_label.size = Vector2(hint_w, 66)
+	hint_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	var c := s.get_center()
 	reload_bar.position = c + Vector2(-80, 60)
 	reload_bar.size = Vector2(160, 8)
+	drop_label.position = Vector2(s.position.x, s.position.y + 64)
+	drop_label.size = Vector2(s.size.x, 60)
 	use_bar.position = c + Vector2(-110, 90)
 	use_bar.size = Vector2(220, 12)
 	interact_label.position = c + Vector2(-300, 110)
@@ -401,6 +431,32 @@ func _unhandled_input(event: InputEvent) -> void:
 		scoreboard_panel.visible = false
 	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_M:
 		toggle_big_map()
+	if event.is_action_pressed("bag") and not get_tree().paused:
+		toggle_bag()
+
+
+## Battle Royale backpack. Touch controls are hidden while it is open so the buttons get the taps.
+func toggle_bag() -> void:
+	if bag == null or MatchConfig.mode != "br":
+		return
+	if bag.visible:
+		bag.close()
+		return
+	if not player.alive or player.downed or player.vehicle != null or player.parachute_state > 0:
+		return
+	touch.release_all()
+	touch.visible = false
+	if not player.touch_mode:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	player.allow_input = false
+	bag.open()
+
+
+func _on_bag_closed() -> void:
+	player.allow_input = true
+	touch.visible = player.touch_mode and not get_tree().paused
+	if not player.touch_mode and not MatchConfig.autoplay_player and DisplayServer.get_name() != "headless":
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _on_vehicle_changed(v: Vehicle) -> void:
@@ -491,6 +547,15 @@ func _process(delta: float) -> void:
 	if player.vehicle and is_instance_valid(player.vehicle):
 		var v := player.vehicle
 		equip_label.text = "%s  %d%%   %d km/h" % [v.display_name(), roundi(100.0 * v.health / v.max_health), roundi(v.speed() * 3.6)]
+	drop_label.visible = player.parachute_state > 0
+	if drop_label.visible:
+		var spd := roundi(player.velocity.length() * 3.6)
+		var hint := ""
+		if player.parachute_state == 1:
+			hint = "Look down to dive faster  |  %s opens the parachute (auto at %d m)" % ["CHUTE" if player.touch_mode else "Space", int(Player.CHUTE_AUTO_AGL)]
+		elif player.agl > Player.CHUTE_MIN_CUT_AGL:
+			hint = "%s closes the parachute  |  you can fire from the hip" % ("CUT" if player.touch_mode else "Space")
+		drop_label.text = "ALT %d m    %d km/h\n%s" % [roundi(player.agl), spd, hint]
 	use_bar.visible = player.using_item != ""
 	if use_bar.visible:
 		use_bar.value = (1.0 - player.use_left / maxf(player.use_total, 0.01)) * 100.0
@@ -519,7 +584,9 @@ func _process(delta: float) -> void:
 		if match_node.has_method("respawn_eta"):
 			death_label.text += "\nRespawning in %.1f" % match_node.respawn_eta(player)
 	hint_label.visible = not player.touch_mode and (match_node.elapsed < 25.0 or get_tree().paused)
-	hint_label.text = "WASD move  Mouse aim  LMB fire  RMB ADS  R reload  Q swap  Shift sprint  C crouch/slide  G/T grenades  V melee  F interact  H heal  X plate  M map  Tab scores  Esc pause"
+	hint_label.text = "WASD move  Mouse aim  LMB fire  RMB ADS  R reload  Q swap  1/2/3 weapons  Shift sprint  C crouch (slide while sprinting)  G/T grenades  V melee  F interact  H heal  X plate  M map  Tab scores  Esc pause"
+	if MatchConfig.mode == "br":
+		hint_label.text += "  I/B backpack  Z first/third person  Space parachute"
 	fps_label.visible = SaveManager.get_setting("graphics", "show_fps", false)
 	if fps_label.visible:
 		fps_label.text = "FPS %d" % Engine.get_frames_per_second()
