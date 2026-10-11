@@ -15,8 +15,10 @@ const ADS_SPEED_MULT := 0.62
 const JUMP_VELOCITY := 7.0
 const ACCEL_GROUND := 13.0
 const ACCEL_AIR := 3.5
-const SLIDE_SPEED := 10.5
-const SLIDE_TIME := 0.75
+const SLIDE_SPEED := 11.5
+const SLIDE_END_SPEED := 4.0
+const SLIDE_TIME := 0.95
+const SLIDE_MIN_SPRINT := 0.2     ## seconds of sprinting needed before crouch becomes a slide
 
 var input := PlayerInput.new()
 var head: Node3D
@@ -31,6 +33,9 @@ var sliding := false
 var slide_t := 0.0
 var slide_dir := Vector3.ZERO
 var sprint_latched := false
+var _want_sprint_prev := false
+var sprint_time := 0.0            ## how long the current sprint has lasted
+var slide_tilt := 0.0             ## camera roll while sliding (radians)
 var ads_on := false
 var ads_blend := 0.0
 var recoil_cam := Vector2.ZERO    ## visual recoil (recovers)
@@ -263,7 +268,7 @@ func _apply_look(delta: float) -> void:
 	recoil_cam = recoil_cam.lerp(Vector2.ZERO, clampf(delta * 10.0, 0, 1))
 	var shake_amt := shake * float(SaveManager.get_setting("accessibility", "camera_shake", 1.0))
 	var sh := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake_amt * 0.02
-	head.rotation = Vector3(pitch + recoil_cam.y + sh.y, recoil_cam.x + sh.x, 0)
+	head.rotation = Vector3(pitch + recoil_cam.y + sh.y, recoil_cam.x + sh.x, slide_tilt)
 	view_model.animate(delta, lk, Vector2(velocity.x, velocity.z).length() / SPRINT_SPEED, is_on_floor(), sprinting)
 
 
@@ -355,28 +360,43 @@ func _move(delta: float) -> void:
 		input.jump = false
 		crouching = false
 		sliding = false
-	# Crouch / slide
-	if input.crouch:
-		if sprinting and on_floor and not sliding:
-			sliding = true
-			slide_t = SLIDE_TIME
-			slide_dir = -transform.basis.z
-			crouching = true
-			AudioManager.play_2d("res://assets/audio/footsteps/footstep_grass_002.ogg", -6.0, 0.7)
+	# Crouch / slide. Crouch while in a real sprint (sprinting for a moment at speed) = slide;
+	# otherwise (walking, standing, just stood up from a crouch) it is a plain crouch toggle.
+	if input.crouch and not sliding:
+		if can_slide():
+			_start_slide()
 		else:
 			crouching = not crouching
 	if input.jump:
-		if crouching and not sliding:
+		if sliding and on_floor:
+			# Slide-cancel jump keeps the momentum.
+			sliding = false
 			crouching = false
+			velocity.y = JUMP_VELOCITY
+		elif crouching and not sliding:
+			if not _blocked_above():
+				crouching = false
 		elif on_floor:
 			velocity.y = JUMP_VELOCITY
-			sliding = false
 			AudioManager.play_2d("res://assets/audio/footsteps/footstep_concrete_001.ogg", -10.0, 1.1)
-	sprinting = want_sprint and not crouching and on_floor or (want_sprint and sprinting and not on_floor)
+	# Starting a sprint from a crouch stands the player up (unless a ceiling is in the way).
+	# Only on a new sprint request, so crouching while still holding sprint stays a crouch.
+	if want_sprint and not _want_sprint_prev and crouching and not sliding and on_floor and not _blocked_above():
+		crouching = false
+	_want_sprint_prev = want_sprint
+	var was_sprinting := sprinting
+	sprinting = want_sprint and not crouching and not sliding and on_floor or (want_sprint and sprinting and not on_floor)
+	sprint_time = sprint_time + delta if sprinting and was_sprinting else (0.0 if not sprinting else delta)
 	if sliding:
 		slide_t -= delta
 		if slide_t <= 0.0 or not on_floor:
 			sliding = false
+			# Still pushing forward with sprint held/locked: get up and keep running (no stuck crouch).
+			if want_sprint and not _blocked_above():
+				crouching = false
+				sprinting = true
+				sprint_time = SLIDE_MIN_SPRINT
+	slide_tilt = lerpf(slide_tilt, deg_to_rad(-4.0) if sliding else 0.0, clampf(delta * 10.0, 0, 1))
 	var target_h := CROUCH_HEIGHT if crouching or sliding else HEIGHT
 	if downed:
 		target_h = DOWNED_HEIGHT
@@ -385,7 +405,7 @@ func _move(delta: float) -> void:
 			crouching = true
 		else:
 			set_height(move_toward(current_height, target_h, delta * 5.0))
-	head.position.y = lerpf(head.position.y, current_height - 0.15 - land_dip, clampf(delta * 14.0, 0, 1))
+	head.position.y = lerpf(head.position.y, current_height - 0.15 - land_dip - (0.18 if sliding else 0.0), clampf(delta * 14.0, 0, 1))
 	land_dip = move_toward(land_dip, 0.0, delta * 0.8)
 
 	var w := inv.active()
@@ -411,8 +431,9 @@ func _move(delta: float) -> void:
 	var hv := Vector3(velocity.x, 0, velocity.z)
 	if sliding:
 		var k := slide_t / SLIDE_TIME
-		target = slide_dir * lerpf(CROUCH_SPEED, SLIDE_SPEED, k) + wish * 1.5
-		hv = hv.lerp(target, clampf(delta * 6.0, 0, 1))
+		# Ease out: fast at the start, slowing towards the end; slight steering only.
+		target = slide_dir * lerpf(SLIDE_END_SPEED, SLIDE_SPEED, k * k) + wish * 1.2
+		hv = hv.lerp(target, clampf(delta * 8.0, 0, 1))
 	else:
 		hv = hv.lerp(target, clampf(delta * (ACCEL_GROUND if on_floor else ACCEL_AIR), 0, 1))
 	velocity.x = hv.x
@@ -436,6 +457,29 @@ func _move(delta: float) -> void:
 			step_accum = 0.0
 			var f := "res://assets/audio/footsteps/footstep_concrete_00%d.ogg" % (randi() % 5)
 			AudioManager.play_2d(f, -16.0 if crouching else -11.0, randf_range(0.9, 1.1))
+
+
+## A crouch press turns into a slide only from an established sprint at speed, on the ground.
+func can_slide() -> bool:
+	if not sprinting or not is_on_floor() or downed or sliding:
+		return false
+	var hs := Vector2(velocity.x, velocity.z).length()
+	var w := inv.active()
+	var top := SPRINT_SPEED * (float(w.stats.move_speed_multiplier) if w else 1.0)
+	return sprint_time >= SLIDE_MIN_SPRINT and hs >= top * 0.75
+
+
+func _start_slide() -> void:
+	sliding = true
+	slide_t = SLIDE_TIME
+	var hv := Vector3(velocity.x, 0, velocity.z)
+	slide_dir = hv.normalized() if hv.length() > 1.0 else -transform.basis.z
+	crouching = true
+	sprinting = false
+	sprint_time = 0.0
+	velocity.x = slide_dir.x * SLIDE_SPEED
+	velocity.z = slide_dir.z * SLIDE_SPEED
+	AudioManager.play_2d("res://assets/audio/footsteps/footstep_grass_002.ogg", -4.0, 0.6)
 
 
 func _blocked_above() -> bool:
@@ -467,17 +511,26 @@ func _handle_weapon(delta: float) -> void:
 	var ads_speed := 1.0 / maxf(float(w.stats.ads_time), 0.05)
 	ads_blend = move_toward(ads_blend, 1.0 if can_aim else 0.0, delta * ads_speed)
 	view_model.ads = ads_blend
-	var target_fov := lerpf(base_fov, float(w.stats.ads_fov), ads_blend)
+	var target_fov := lerpf(base_fov + (6.0 if sliding else 0.0), float(w.stats.ads_fov), ads_blend)
 	camera.fov = lerpf(camera.fov, target_fov, clampf(delta * 18.0, 0, 1))
 	var auto_fire: bool = SaveManager.get_setting("controls", "auto_fire", false) and touch_mode and on_target
 	var trigger := (input.fire or auto_fire) and not view_model.is_busy() and parachute_state == 0
 	if trigger and sprinting:
 		sprinting = false
-	var moving := Vector2(velocity.x, velocity.z).length() > 1.0
 	var origin := camera.global_position
-	var res := process_trigger(trigger, origin, look_dir(), view_model.muzzle_global(), ads_blend > 0.6, moving)
-	if not res.is_empty():
-		pass
+	process_trigger(trigger, origin, look_dir(), view_model.muzzle_global(), ads_blend > 0.6, is_moving(), current_spread())
+
+
+func is_moving() -> bool:
+	return Vector2(velocity.x, velocity.z).length() > 1.0
+
+
+## Cone half-angle (degrees) the next shot will use. Shared by firing and the HUD crosshair.
+func current_spread() -> float:
+	var w := inv.active()
+	if w == null:
+		return 0.0
+	return w.spread_deg(ads_blend > 0.6, is_moving(), not is_on_floor() and parachute_state == 0, sliding, crouching)
 
 
 func _on_shot(w: WeaponInstance, res: Dictionary) -> void:

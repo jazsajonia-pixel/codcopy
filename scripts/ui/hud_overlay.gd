@@ -9,6 +9,7 @@ var hit_head := false
 var hit_kill := false
 var damage_dirs: Array = []   ## {pos: Vector3, t: float}
 var _font: Font
+var _spread_px := 0.0
 
 
 func _ready() -> void:
@@ -78,31 +79,44 @@ func _draw() -> void:
 		draw_line(c - Vector2(r, 0), c + Vector2(r, 0), Color(0, 0, 0, 0.9), 1.5)
 		draw_line(c - Vector2(0, r), c + Vector2(0, r), Color(0, 0, 0, 0.9), 1.5)
 		draw_circle(c, 2.0, Color(1, 0.1, 0.1))
-	elif player.alive and w and player.parachute_state == 0:
-		var spread := w.spread_deg(player.ads_blend > 0.6, Vector2(player.velocity.x, player.velocity.z).length() > 1.0, not player.is_on_floor())
-		var px := tan(deg_to_rad(spread)) / tan(deg_to_rad(player.camera.fov * 0.5)) * sz.y * 0.5
-		px = clampf(px, 4.0, 140.0) * (1.0 - player.ads_blend * 0.9)
+	elif player.alive and w and player.parachute_state != 1 and not player.downed:
+		# Exact cone of the next shot projected to pixels (vertical FOV), smoothed slightly so it
+		# animates; it expands with every shot (bloom) and recovers as the weapon settles.
+		var spread := player.current_spread()
+		var want_px := tan(deg_to_rad(spread)) / tan(deg_to_rad(player.camera.fov * 0.5)) * sz.y * 0.5
+		_spread_px = lerpf(_spread_px, want_px, clampf(get_process_delta_time() * 22.0, 0, 1)) if _spread_px > 0.0 else want_px
+		var px := maxf(_spread_px, 3.0)
 		var col := Bot._enemy_color() if player.on_target else Color(1, 1, 1, 0.9)
-		if player.ads_blend < 0.9:
-			var L := 9.0
-			for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
-				draw_line(c + d * px, c + d * (px + L), Color(0, 0, 0, 0.5), 4.0)
-				draw_line(c + d * px, c + d * (px + L), col, 2.0)
+		var hip_a := clampf(1.0 - player.ads_blend * 1.6, 0.0, 1.0)
+		if hip_a > 0.02:
+			var shadow := Color(0, 0, 0, 0.5 * hip_a)
+			var cc := Color(col, col.a * hip_a)
+			if int(w.stats.pellets) > 1:
+				# Shotguns: a circle showing where the pellets land.
+				draw_arc(c, px, 0, TAU, 48, shadow, 3.5, true)
+				draw_arc(c, px, 0, TAU, 48, cc, 1.6, true)
+				draw_circle(c, 1.8, cc)
+			else:
+				var L := 9.0
+				for d in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+					draw_line(c + d * px, c + d * (px + L), shadow, 4.0)
+					draw_line(c + d * px, c + d * (px + L), cc, 2.0)
+				draw_circle(c, 1.4, cc)
 		if player.ads_blend > 0.5:
+			var al := clampf((player.ads_blend - 0.5) * 2.0, 0, 1)
 			var optic: String = w.stats.optic
 			if optic == "red_dot":
-				draw_circle(c, 2.5, Color(1, 0.15, 0.15, player.ads_blend))
+				draw_circle(c, 3.2, Color(0, 0, 0, 0.35 * al))
+				draw_circle(c, 2.4, Color(1, 0.12, 0.12, al))
 			elif optic == "holo":
-				draw_arc(c, 10, 0, TAU, 32, Color(0.3, 1, 0.45, player.ads_blend), 1.5, true)
-				draw_circle(c, 1.5, Color(0.3, 1, 0.45, player.ads_blend))
+				draw_arc(c, 11, 0, TAU, 40, Color(0.3, 1, 0.45, 0.9 * al), 1.6, true)
+				draw_circle(c, 1.6, Color(0.3, 1, 0.45, al))
+				for d in [Vector2(0, -1), Vector2(-1, 0), Vector2(1, 0)]:
+					draw_line(c + d * 14, c + d * 19, Color(0.3, 1, 0.45, 0.9 * al), 1.6)
 			elif optic in ["4x", "8x"]:
-				draw_line(c - Vector2(30, 0), c + Vector2(30, 0), Color(0, 0, 0, player.ads_blend), 1.5)
-				draw_line(c, c + Vector2(0, 30), Color(0, 0, 0, player.ads_blend), 1.5)
-				draw_circle(c, 2.0, Color(1, 0.2, 0.1, player.ads_blend))
-			else:
-				draw_circle(c, 1.5, Color(1, 1, 1, 0.8))
-		else:
-			draw_circle(c, 1.5, col)
+				draw_line(c - Vector2(30, 0), c + Vector2(30, 0), Color(0, 0, 0, al), 1.5)
+				draw_line(c, c + Vector2(0, 30), Color(0, 0, 0, al), 1.5)
+				draw_circle(c, 2.0, Color(1, 0.2, 0.1, al))
 	# Hit marker
 	if hit_t > 0.0:
 		var s := float(SaveManager.get_setting("accessibility", "hitmarker_scale", 1.0))

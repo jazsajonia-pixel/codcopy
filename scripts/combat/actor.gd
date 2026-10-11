@@ -335,7 +335,7 @@ func tick_common(delta: float) -> void:
 # ---------------- Weapons ----------------
 
 ## Fire the active weapon if possible. `trigger` is the held state this frame.
-func process_trigger(trigger: bool, origin: Vector3, dir: Vector3, muzzle: Vector3, ads: bool, moving: bool) -> Dictionary:
+func process_trigger(trigger: bool, origin: Vector3, dir: Vector3, muzzle: Vector3, ads: bool, moving: bool, spread_override: float = -1.0) -> Dictionary:
 	var w := inv.active()
 	if w == null or not alive or downed or using_item != "":
 		return {}
@@ -344,7 +344,7 @@ func process_trigger(trigger: bool, origin: Vector3, dir: Vector3, muzzle: Vecto
 			w.start_reload()
 			_on_reload_started(w)
 		return {}
-	var spread := w.spread_deg(ads, moving, not is_on_floor())
+	var spread := spread_override if spread_override >= 0.0 else w.spread_deg(ads, moving, not is_on_floor())
 	var res := Combat.fire_hitscan(self, origin, dir, w, spread, muzzle, true)
 	var loud: bool = not w.stats.suppressed
 	AudioManager.play_3d(w.data.fire_sound, muzzle, -2.0 if loud else -16.0, randf_range(0.95, 1.05), 160.0 if loud else 30.0)

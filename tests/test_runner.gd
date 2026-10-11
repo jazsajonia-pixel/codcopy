@@ -35,6 +35,8 @@ func _ready() -> void:
 			get_tree().root.add_child.call_deferred(nt)
 		"phone":
 			get_tree().root.add_child.call_deferred(load("res://tests/phone_test.gd").new())
+		"moves":
+			get_tree().root.add_child.call_deferred(load("res://tests/moves_test.gd").new())
 		"keys":
 			get_tree().root.add_child.call_deferred(load("res://tests/keys_test.gd").new())
 		"dom":

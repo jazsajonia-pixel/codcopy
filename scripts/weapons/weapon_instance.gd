@@ -136,9 +136,11 @@ func reload_progress() -> float:
 	return 1.0 - reload_left / reload_total
 
 
-## Total cone half-angle in degrees for the next shot.
-func spread_deg(ads: bool, moving: bool, airborne: bool, sliding: bool = false) -> float:
+## Total cone half-angle in degrees for the next shot. The HUD crosshair draws exactly this cone.
+func spread_deg(ads: bool, moving: bool, airborne: bool, sliding: bool = false, crouched: bool = false) -> float:
 	var s: float = stats.ads_spread_deg if ads else stats.hip_spread_deg
+	if crouched and not ads:
+		s *= 0.8
 	if moving:
 		s += stats.move_spread_deg * (0.35 if ads else 1.0)
 	if airborne:
