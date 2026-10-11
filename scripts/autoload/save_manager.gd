@@ -82,7 +82,7 @@ const DEFAULT_PROFILE := {
 	"wins": 0,
 	"kills": 0,
 	"deaths": 0,
-	"operator": "op_ranger",
+	"operator": "op_sentinel",
 	"loadout_index": 0,
 	"loadouts": [
 		{"name": "Assault", "primary": "ar_m4k", "secondary": "pistol_p9", "melee": "knife",

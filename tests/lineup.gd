@@ -24,7 +24,10 @@ func _ready() -> void:
 	for i in paths.size():
 		var m := ActorModel.new()
 		add_child(m)
-		m.setup(paths[i])
+		if String(paths[i]).begins_with("op_"):
+			m.setup_operator(GameDB.get_operator(paths[i]))
+		else:
+			m.setup(paths[i])
 		m.position = Vector3((i - (paths.size() - 1) * 0.5) * 1.3, 0, 0)
 		m.rotation.y = PI + 0.5
 		if state in ["armed", "walk", "crouch"]:

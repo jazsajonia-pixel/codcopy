@@ -59,7 +59,7 @@ var current_height := HEIGHT
 var last_hit_from := Vector3.ZERO   ## where the most recent damage came from (death physics)
 var last_hit_force := 1.0           ## 1 = bullet, ~3+ = explosion / heavy hit
 var inv := Inventory.new()
-var operator_id := "op_ranger"
+var operator_id := "op_sentinel"
 
 var _since_damage := 99.0
 var _damagers := {}           ## Actor -> last damage time (msec), for assists

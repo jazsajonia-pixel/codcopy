@@ -69,6 +69,29 @@ var _death_spin := 0.0
 var _death_yaw := 0.0
 
 
+## Build the rig for an operator entry from GameDB.OPERATORS (model + optional colour variant).
+func setup_operator(op: Dictionary) -> void:
+	setup(op.model)
+	apply_tint(op.get("tint", {}))
+
+
+## Recolour named materials (Toon Shooter variants): {"Character_Main": Color, ...}. Materials are duplicated
+## per actor so variants never leak into each other.
+func apply_tint(tint: Dictionary) -> void:
+	if tint.is_empty() or model == null:
+		return
+	for m in model.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for i in mi.mesh.get_surface_count():
+			var mat := mi.get_active_material(i)
+			if mat is StandardMaterial3D and tint.has(String(mat.resource_name)):
+				var dup := (mat as StandardMaterial3D).duplicate() as StandardMaterial3D
+				dup.albedo_color = tint[String(mat.resource_name)]
+				mi.set_surface_override_material(i, dup)
+
+
 func setup(model_path: String) -> void:
 	pose_root = Node3D.new()
 	pose_root.position.y = 0.9

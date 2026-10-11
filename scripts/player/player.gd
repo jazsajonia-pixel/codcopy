@@ -110,7 +110,7 @@ func _ready() -> void:
 	body = ActorModel.new()
 	body.name = "Body"
 	add_child(body)
-	body.setup(GameDB.get_operator(operator_id).model)
+	body.setup_operator(GameDB.get_operator(operator_id))
 	body.set_shadow_only(true)
 	base_fov = float(SaveManager.get_setting("graphics", "fov", 80.0))
 	camera.fov = base_fov

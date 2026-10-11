@@ -91,7 +91,7 @@ func _ready() -> void:
 	model = ActorModel.new()
 	model.name = "Body"
 	add_child(model)
-	model.setup(op.model)
+	model.setup_operator(op)
 	gun_holder = model.gun_holder
 	name_tag = Label3D.new()
 	name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED

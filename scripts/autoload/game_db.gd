@@ -64,18 +64,20 @@ const EQUIPMENT := {
 }
 
 const OPERATORS := [
-	{"id": "op_ranger", "name": "Ranger", "faction": "Vanguard", "model": "res://assets/characters/character-male-a.glb", "unlock": 1, "bio": "Recon specialist from the northern highlands."},
-	{"id": "op_viper", "name": "Viper", "faction": "Vanguard", "model": "res://assets/characters/character-female-a.glb", "unlock": 1, "bio": "Close-quarters breacher."},
-	{"id": "op_atlas", "name": "Atlas", "faction": "Vanguard", "model": "res://assets/characters/character-male-b.glb", "unlock": 2, "bio": "Heavy weapons operator."},
-	{"id": "op_echo", "name": "Echo", "faction": "Vanguard", "model": "res://assets/characters/character-female-b.glb", "unlock": 3, "bio": "Signals and electronic warfare."},
-	{"id": "op_bishop", "name": "Bishop", "faction": "Vanguard", "model": "res://assets/characters/character-male-c.glb", "unlock": 5, "bio": "Veteran squad leader."},
-	{"id": "op_nova", "name": "Nova", "faction": "Vanguard", "model": "res://assets/characters/character-female-c.glb", "unlock": 7, "bio": "Combat medic and marksman."},
-	{"id": "op_kraken", "name": "Kraken", "faction": "Syndicate", "model": "res://assets/characters/character-male-d.glb", "unlock": 9, "bio": "Former naval commando."},
-	{"id": "op_raven", "name": "Raven", "faction": "Syndicate", "model": "res://assets/characters/character-female-d.glb", "unlock": 11, "bio": "Night operations expert."},
-	{"id": "op_ghoul", "name": "Ghoul", "faction": "Syndicate", "model": "res://assets/characters/character-male-e.glb", "unlock": 13, "bio": "Demolitions and sabotage."},
-	{"id": "op_lynx", "name": "Lynx", "faction": "Syndicate", "model": "res://assets/characters/character-female-e.glb", "unlock": 15, "bio": "Long-range infiltrator."},
-	{"id": "op_titan", "name": "Titan", "faction": "Syndicate", "model": "res://assets/characters/character-male-f.glb", "unlock": 18, "bio": "Juggernaut assault lead."},
-	{"id": "op_zero", "name": "Zero", "faction": "Syndicate", "model": "res://assets/characters/character-female-f.glb", "unlock": 20, "bio": "Classified."},
+	{"id": "op_sentinel", "name": "Sentinel", "faction": "Vanguard", "model": "res://assets/characters/toon/Character_Soldier.gltf", "unlock": 1, "bio": "Frontline rifleman. Standard-issue chibi soldier.", "style": "Toon"},
+	{"id": "op_frostbite", "name": "Frostbite", "faction": "Vanguard", "model": "res://assets/characters/toon/Character_Soldier.gltf", "unlock": 3, "bio": "Arctic recon. Hates the heat.", "style": "Toon", "tint": {"Character_Main": Color(0.85, 0.88, 0.90), "Pants": Color(0.62, 0.66, 0.70), "Grey": Color(0.95, 0.95, 0.97)}},
+	{"id": "op_dune", "name": "Dune", "faction": "Vanguard", "model": "res://assets/characters/toon/Character_Soldier.gltf", "unlock": 5, "bio": "Desert patrol leader.", "style": "Toon", "tint": {"Character_Main": Color(0.78, 0.66, 0.45), "Pants": Color(0.60, 0.50, 0.33)}},
+	{"id": "op_tide", "name": "Tide", "faction": "Vanguard", "model": "res://assets/characters/toon/Character_Soldier.gltf", "unlock": 8, "bio": "Naval infantry.", "style": "Toon", "tint": {"Character_Main": Color(0.16, 0.25, 0.50), "Pants": Color(0.12, 0.16, 0.30), "Grey": Color(0.75, 0.78, 0.85)}},
+	{"id": "op_urban", "name": "Concrete", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Soldier.gltf", "unlock": 11, "bio": "City-fighting specialist.", "style": "Toon", "tint": {"Character_Main": Color(0.30, 0.31, 0.33), "Pants": Color(0.18, 0.18, 0.20), "Grey": Color(0.45, 0.45, 0.48)}},
+	{"id": "op_jungle", "name": "Viper", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Soldier.gltf", "unlock": 14, "bio": "Jungle ambush expert.", "style": "Toon", "tint": {"Character_Main": Color(0.20, 0.45, 0.18), "Pants": Color(0.25, 0.30, 0.15), "Skin": Color(0.45, 0.30, 0.20)}},
+	{"id": "op_hazard", "name": "Hazard", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Hazmat.gltf", "unlock": 4, "bio": "Chemical warfare specialist in a sealed suit.", "style": "Toon"},
+	{"id": "op_toxic", "name": "Toxic", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Hazmat.gltf", "unlock": 9, "bio": "Leaks something green.", "style": "Toon", "tint": {"Hazmat_Main": Color(0.45, 0.80, 0.15)}},
+	{"id": "op_blaze", "name": "Blaze", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Hazmat.gltf", "unlock": 13, "bio": "Flame unit. Fire-proof suit.", "style": "Toon", "tint": {"Hazmat_Main": Color(0.90, 0.38, 0.10)}},
+	{"id": "op_cleanroom", "name": "Sterile", "faction": "Vanguard", "model": "res://assets/characters/toon/Character_Hazmat.gltf", "unlock": 17, "bio": "Decontamination team.", "style": "Toon", "tint": {"Hazmat_Main": Color(0.90, 0.92, 0.95)}},
+	{"id": "op_crimson", "name": "Crimson", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Enemy.gltf", "unlock": 6, "bio": "Syndicate shock trooper.", "style": "Toon"},
+	{"id": "op_phantom", "name": "Phantom", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Enemy.gltf", "unlock": 10, "bio": "Covert operations.", "style": "Toon", "tint": {"Enemy_Red": Color(0.40, 0.18, 0.60)}},
+	{"id": "op_cobalt2", "name": "Riptide", "faction": "Vanguard", "model": "res://assets/characters/toon/Character_Enemy.gltf", "unlock": 15, "bio": "Amphibious assault.", "style": "Toon", "tint": {"Enemy_Red": Color(0.10, 0.50, 0.60)}},
+	{"id": "op_shadow", "name": "Shadow", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Enemy.gltf", "unlock": 20, "bio": "Nobody has seen his face.", "style": "Toon", "tint": {"Enemy_Red": Color(0.12, 0.12, 0.14), "Grey": Color(0.30, 0.30, 0.32)}},
 	{"id": "op_brick", "name": "Brick", "faction": "Vanguard", "model": "res://assets/characters/blocky/character-a.glb", "unlock": 1, "bio": "Breaching charge specialist.", "style": "Blocky"},
 	{"id": "op_pixel", "name": "Pixel", "faction": "Vanguard", "model": "res://assets/characters/blocky/character-b.glb", "unlock": 1, "bio": "Drone pilot and hacker.", "style": "Blocky"},
 	{"id": "op_sarge", "name": "Sarge", "faction": "Vanguard", "model": "res://assets/characters/blocky/character-c.glb", "unlock": 5, "bio": "Drill instructor turned operator.", "style": "Blocky"},
@@ -94,9 +96,6 @@ const OPERATORS := [
 	{"id": "op_static", "name": "Static", "faction": "Syndicate", "model": "res://assets/characters/blocky/character-p.glb", "unlock": 7, "bio": "Electronic warfare.", "style": "Blocky"},
 	{"id": "op_grit", "name": "Grit", "faction": "Vanguard", "model": "res://assets/characters/blocky/character-q.glb", "unlock": 9, "bio": "Desert patrol veteran.", "style": "Blocky"},
 	{"id": "op_wisp", "name": "Wisp", "faction": "Syndicate", "model": "res://assets/characters/blocky/character-r.glb", "unlock": 11, "bio": "Silent infiltrator.", "style": "Blocky"},
-	{"id": "op_sentinel", "name": "Sentinel", "faction": "Vanguard", "model": "res://assets/characters/toon/Character_Soldier.gltf", "unlock": 1, "bio": "Frontline rifleman. Standard-issue chibi soldier.", "style": "Toon"},
-	{"id": "op_hazard", "name": "Hazard", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Hazmat.gltf", "unlock": 6, "bio": "Chemical warfare specialist in a sealed suit.", "style": "Toon"},
-	{"id": "op_crimson", "name": "Crimson", "faction": "Syndicate", "model": "res://assets/characters/toon/Character_Enemy.gltf", "unlock": 12, "bio": "Syndicate shock trooper.", "style": "Toon"},
 ]
 
 ## Weapon skins are material tints layered over the original model.

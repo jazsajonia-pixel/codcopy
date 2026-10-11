@@ -60,7 +60,7 @@ func set_operator(op_id: String, weapon_id: String = "") -> void:
 	var op := GameDB.get_operator(op_id)
 	var am := ActorModel.new()
 	stage.add_child(am)
-	am.setup(op.model)
+	am.setup_operator(op)
 	am.rotation.y = PI
 	model = am
 	_armed = weapon_id != ""
