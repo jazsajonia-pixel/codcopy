@@ -4,9 +4,8 @@ extends MatchBase
 
 enum Phase { BOARDING, PLANE, ACTIVE, OVER }
 
-const PLANE_HEIGHT := 160.0
-const PLANE_SPEED := 16.0
-const CHUTE_AUTO_AGL := 70.0
+const PLANE_HEIGHT := 240.0   ## higher drop = longer wingsuit glide
+const PLANE_SPEED := 13.0
 
 var phase := Phase.BOARDING
 var boarding := 6.0
@@ -20,7 +19,6 @@ var plane_t := 0.0
 var plane_len := 1.0
 var bot_drop_t := {}     ## Bot -> plane progress (0..1) at which it jumps
 var player_dropped := false
-var chute_mesh: Node3D
 var placement := 0
 var end_timer := -1.0
 var zone_tick := 0.0
@@ -65,7 +63,6 @@ func _ready() -> void:
 	_spawn_vehicles()
 	_build_zone()
 	_build_plane()
-	_build_chute()
 	zone.land_check = func(p: Vector2): return _isla.height(p.x, p.y) > 1.0
 	zone.setup(Vector2.ZERO, 190.0, time_scale, rng.randi())
 	zone.phase_changed.connect(_on_zone_phase)
@@ -202,22 +199,6 @@ func _build_plane() -> void:
 		bot_drop_t[b] = clampf(rng.randf_range(0.12, 0.88), 0.0, 1.0)
 
 
-func _build_chute() -> void:
-	chute_mesh = MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 2.6
-	sm.height = 2.0
-	sm.is_hemisphere = true
-	(chute_mesh as MeshInstance3D).mesh = sm
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.85, 0.55, 0.15)
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	(chute_mesh as MeshInstance3D).material_override = m
-	chute_mesh.position = Vector3(0, 4.2, 0)
-	chute_mesh.visible = false
-	player.add_child(chute_mesh)
-
-
 # ---------------- Loop ----------------
 
 func _process(delta: float) -> void:
@@ -249,6 +230,7 @@ func _physics_process(_delta: float) -> void:
 		player.global_position = plane.global_position - plane.global_transform.basis.z * -18.0 + Vector3.UP * 6.0
 		player.velocity = Vector3.ZERO
 		player.parachute_state = 0
+		player.body.visible = false    # riding inside the aircraft
 
 
 func _tick_plane(delta: float) -> void:
@@ -278,7 +260,11 @@ func _drop_player() -> void:
 	player.consume_jump()
 	player.global_position = plane.global_position + Vector3.DOWN * 4.0
 	player.parachute_state = 1
-	player.velocity = Vector3.ZERO
+	player.drop_grace = 0.8
+	player.body.visible = true
+	# Leave with some of the aircraft's speed, facing the flight direction.
+	var fwd := (plane_to - plane_from).normalized()
+	player.velocity = fwd * 8.0
 	player.allow_input = true
 	AudioManager.play_2d("res://assets/audio/ambience/wind.ogg", -6.0)
 	# AI teammates jump with the player and follow them down.
@@ -292,6 +278,8 @@ func _drop_bot(b: Bot) -> void:
 	b.visible = true
 	b.global_position = plane.global_position + Vector3(rng.randf_range(-3, 3), -4, rng.randf_range(-3, 3))
 	b.parachute = true
+	b.chute_open = false
+	b.velocity = (plane_to - plane_from).normalized() * 8.0
 	# Head to the nearest POI (with spread) from the drop point.
 	var best: Dictionary = map.pois[0]
 	var bd := INF
@@ -309,7 +297,6 @@ func _tick_active(delta: float) -> void:
 	if not player_dropped:
 		_drop_player()
 	_update_squad(delta)
-	_update_player_chute()
 	zone_tick -= delta
 	if zone_tick <= 0.0:
 		zone_tick = 1.0
@@ -323,21 +310,6 @@ func _tick_active(delta: float) -> void:
 			_game_over(false)
 		elif alive_teams() <= 1:
 			_game_over(true)
-
-
-func _update_player_chute() -> void:
-	if player.parachute_state == 0:
-		chute_mesh.visible = false
-		return
-	var space := get_world_3d().direct_space_state
-	var q := PhysicsRayQueryParameters3D.create(player.global_position, player.global_position + Vector3.DOWN * 300.0, 1)
-	var hit := space.intersect_ray(q)
-	var agl: float = player.global_position.y - (hit.position.y if not hit.is_empty() else 0.0)
-	if player.parachute_state == 1:
-		if agl < CHUTE_AUTO_AGL or (player.jump_recent() and agl < PLANE_HEIGHT - 20.0):
-			player.parachute_state = 2
-			AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -2.0, 0.6)
-	chute_mesh.visible = player.parachute_state == 2
 
 
 func _update_zone_visual() -> void:

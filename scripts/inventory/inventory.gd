@@ -10,6 +10,7 @@ const MAX_AMMO := {"rifle": 240, "smg": 280, "shotgun": 48, "sniper": 40, "pisto
 
 var weapons: Array = [null, null] ## WeaponInstance per slot
 var current := 0
+var holstered := false            ## fists / melee out (player weapon bar); active() returns null
 var use_ammo_pools := false
 var ammo := {"rifle": 0, "smg": 0, "shotgun": 0, "sniper": 0, "pistol": 0}
 var lethal := ""
@@ -22,6 +23,8 @@ var plates := 0
 
 
 func active() -> WeaponInstance:
+	if holstered:
+		return null
 	var w = weapons[current]
 	if w == null:
 		for i in MAX_WEAPONS:
@@ -45,27 +48,45 @@ func set_weapon(slot: int, w: WeaponInstance) -> WeaponInstance:
 
 
 func switch_to(slot: int) -> bool:
-	if slot == current or slot < 0 or slot >= MAX_WEAPONS or weapons[slot] == null:
+	if slot < 0 or slot >= MAX_WEAPONS or weapons[slot] == null or (slot == current and not holstered):
 		return false
 	var a := active()
 	if a:
 		a.cancel_reload()
+	holstered = false
 	current = slot
 	changed.emit()
 	return true
 
 
 func cycle() -> bool:
+	if holstered:
+		return switch_to(current) or switch_to((current + 1) % MAX_WEAPONS)
 	return switch_to((current + 1) % MAX_WEAPONS)
 
 
+## Put weapons away (fists / melee). Returns false if already holstered.
+func holster() -> bool:
+	if holstered:
+		return false
+	var a := active()
+	if a:
+		a.cancel_reload()
+	holstered = true
+	changed.emit()
+	return true
+
+
 ## BR pickup: fills an empty slot or replaces the active weapon. Returns the dropped weapon (or null).
-func pick_up_weapon(w: WeaponInstance) -> WeaponInstance:
+func pick_up_weapon(w: WeaponInstance, equip: bool = true) -> WeaponInstance:
 	for i in MAX_WEAPONS:
 		if weapons[i] == null:
+			if equip or not has_any_weapon() or holstered:
+				current = i
+				holstered = false
 			set_weapon(i, w)
-			current = i
 			return null
+	holstered = false
 	var dropped = set_weapon(current, w)
 	return dropped
 

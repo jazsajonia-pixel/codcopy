@@ -19,6 +19,16 @@ const SLIDE_SPEED := 11.5
 const SLIDE_END_SPEED := 4.0
 const SLIDE_TIME := 0.95
 const SLIDE_MIN_SPRINT := 0.2     ## seconds of sprinting needed before crouch becomes a slide
+# Battle Royale drop (also used by bots): wingsuit glide, dive, parachute.
+const GLIDE_FALL := 15.0          ## m/s down while gliding level
+const GLIDE_SPEED := 27.0         ## m/s forward while gliding
+const DIVE_FALL := 42.0           ## m/s down when diving straight down
+const CHUTE_FALL := 5.5
+const CHUTE_SPEED := 10.0
+const CHUTE_AUTO_AGL := 45.0      ## parachute opens by itself below this height
+const CHUTE_MIN_CUT_AGL := 28.0   ## can't close the parachute below this height
+const TPP_OFFSET := Vector3(1.1, 0.5, 3.4)
+const DROP_CAM_OFFSET := Vector3(0.0, 1.6, 7.5)
 
 var input := PlayerInput.new()
 var head: Node3D
@@ -52,7 +62,14 @@ var aim_assist_target: Actor = null
 var death_cam_target: Actor = null
 var death_time := 0.0
 var touch_mode := false
-var parachute_state := 0          ## 0 none, 1 freefall, 2 chute (set by BR deploy)
+var parachute_state := 0          ## 0 none, 1 wingsuit freefall, 2 parachute (set by BR deploy)
+var drop_grace := 0.0             ## ignore chute toggles right after leaving the aircraft
+var agl := 0.0                    ## height above ground while dropping
+var body: ActorModel              ## own animated body: third-person view, first-person shadow
+var cam_tpp := 0.0                ## 0 = first person, 1 = third person camera
+var scope_hide := false           ## set by the HUD while a full-screen scope covers the view
+var _body_shadow_only := true
+var _melee_swing := 0.0
 var allow_input := true
 var on_target := false            ## crosshair currently over an enemy
 var _jump_at := -10000
@@ -84,6 +101,11 @@ func _ready() -> void:
 	head.add_child(camera)
 	view_model = ViewModel.new()
 	camera.add_child(view_model)
+	body = ActorModel.new()
+	body.name = "Body"
+	add_child(body)
+	body.setup(GameDB.get_operator(operator_id).model)
+	body.set_shadow_only(true)
 	base_fov = float(SaveManager.get_setting("graphics", "fov", 80.0))
 	camera.fov = base_fov
 	inv.changed.connect(_on_inv_changed)
@@ -93,6 +115,9 @@ func _ready() -> void:
 
 func equip_current() -> void:
 	view_model.set_weapon(inv.active())
+	if body:
+		body.set_weapon(inv.active())
+		body.set_shadow_only(_body_shadow_only)
 	weapon_changed.emit(inv.active())
 
 
@@ -103,6 +128,15 @@ func _on_inv_changed() -> void:
 
 func look_dir() -> Vector3:
 	return -camera.global_transform.basis.z
+
+
+## Battle Royale third-person preference (Multiplayer is always first person, like CODM).
+func wants_tpp() -> bool:
+	return MatchConfig.mode == "br" and SaveManager.get_setting("controls", "br_view", "tpp") == "tpp"
+
+
+func is_third_person() -> bool:
+	return cam_tpp > 0.35
 
 
 # ---------------- Input ----------------
@@ -120,6 +154,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("crouch"): input.crouch = true
 	elif event.is_action_pressed("reload"): input.reload = true
 	elif event.is_action_pressed("switch_weapon"): input.switch_weapon = true
+	elif event.is_action_pressed("slot_1"): input.select_slot = 0
+	elif event.is_action_pressed("slot_2"): input.select_slot = 1
+	elif event.is_action_pressed("slot_3"):
+		if MatchConfig.mode == "br":
+			input.select_slot = 2
+		else:
+			input.melee = true
+	elif event.is_action_pressed("toggle_view"): input.toggle_view = true
 	elif event.is_action_pressed("lethal"): input.lethal = true
 	elif event.is_action_pressed("tactical"): input.tactical = true
 	elif event.is_action_pressed("melee"): input.melee = true
@@ -184,6 +226,7 @@ func _physics_process(delta: float) -> void:
 		_poll_keyboard()
 	if not alive:
 		_death_cam(delta)
+		_update_body(delta)
 		input.clear_pressed()
 		return
 	if not allow_input:
@@ -195,14 +238,15 @@ func _physics_process(delta: float) -> void:
 		return
 	if input.jump:
 		_jump_at = Time.get_ticks_msec()
-	view_model.visible = not downed
 	view_model.use_item = using_item
 	view_model.use_progress = 1.0 - use_left / maxf(use_total, 0.01) if using_item != "" else 0.0
 	_apply_look(delta)
 	_handle_actions()
 	_move(delta)
+	_update_camera(delta)
 	_handle_weapon(delta)
 	_scan_interact(delta)
+	_update_body(delta)
 	if revive_target and input.interact_held and not downed:
 		if not revive_target.downed or not revive_target.alive or revive_target.global_position.distance_to(global_position) > 2.6:
 			revive_target = null
@@ -311,6 +355,10 @@ func _aim_assist(delta: float, lk: Vector2) -> void:
 
 
 func _handle_actions() -> void:
+	if input.toggle_view and MatchConfig.mode == "br":
+		SaveManager.set_setting("controls", "br_view", "fpp" if wants_tpp() else "tpp")
+	if input.select_slot >= 0:
+		select_slot(input.select_slot)
 	var w := inv.active()
 	if input.switch_weapon and inv.cycle():
 		AudioManager.play_2d("res://assets/audio/ui/switch_002.ogg", -10.0)
@@ -487,14 +535,37 @@ func _blocked_above() -> bool:
 	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
+func _ground_below() -> float:
+	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * 600.0, 1, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	return hit.position.y if not hit.is_empty() else -50.0
+
+
+## Wingsuit (state 1): push forward to glide, look down to dive (faster fall, less distance).
+## Parachute (state 2): slow descent and steering; weapons can be fired from the hip.
+## JUMP opens the parachute early or closes it again (above CHUTE_MIN_CUT_AGL); it also opens
+## by itself below CHUTE_AUTO_AGL.
 func _parachute_move(delta: float) -> void:
+	drop_grace = maxf(drop_grace - delta, 0.0)
+	agl = global_position.y - _ground_below()
+	if input.jump and drop_grace <= 0.0:
+		if parachute_state == 1:
+			_open_chute()
+		elif parachute_state == 2 and agl > CHUTE_MIN_CUT_AGL:
+			parachute_state = 1
+			AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -6.0, 1.4)
+	if parachute_state == 1 and agl < CHUTE_AUTO_AGL:
+		_open_chute()
 	var wish := (transform.basis * Vector3(input.move.x, 0, input.move.y)).limit_length(1.0)
-	var fall := 38.0 if parachute_state == 1 else 6.5
-	var horiz := 22.0 if parachute_state == 1 else 12.0
-	if parachute_state == 1 and pitch < deg_to_rad(-45):
-		fall = 52.0   # dive
-	var hv := Vector3(velocity.x, 0, velocity.z).lerp(wish * horiz, clampf(delta * 2.0, 0, 1))
-	velocity = Vector3(hv.x, move_toward(velocity.y, -fall, delta * 30.0), hv.z)
+	var fall := CHUTE_FALL
+	var horiz := CHUTE_SPEED * wish.length()
+	if parachute_state == 1:
+		var dive := clampf((-pitch - deg_to_rad(15.0)) / deg_to_rad(60.0), 0.0, 1.0)
+		var push := clampf(-input.move.y, 0.0, 1.0)
+		fall = lerpf(lerpf(GLIDE_FALL * 1.5, GLIDE_FALL, push), DIVE_FALL, dive)
+		horiz = wish.length() * GLIDE_SPEED * (1.0 - 0.45 * dive)
+	var hv := Vector3(velocity.x, 0, velocity.z).lerp(wish.normalized() * horiz if wish.length() > 0.05 else Vector3.ZERO, clampf(delta * 1.6, 0, 1))
+	velocity = Vector3(hv.x, move_toward(velocity.y, -fall, delta * 24.0), hv.z)
 	move_and_slide()
 	if is_on_floor():
 		parachute_state = 0
@@ -502,10 +573,86 @@ func _parachute_move(delta: float) -> void:
 		AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -4.0)
 
 
+func _open_chute() -> void:
+	parachute_state = 2
+	AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -2.0, 0.6)
+
+
+## Third-person camera on the head pivot (orbits with pitch), pulled in when something is behind
+## the player. ADS in third person goes to first person (like CODM). Always third person while
+## dropping so the wingsuit and parachute are visible.
+func _update_camera(delta: float) -> void:
+	var off := TPP_OFFSET
+	var want := 0.0
+	if parachute_state > 0:
+		want = 1.0
+		off = DROP_CAM_OFFSET
+	elif wants_tpp():
+		want = 1.0 - ads_blend
+	cam_tpp = move_toward(cam_tpp, want, delta * 4.0)
+	var local := off * cam_tpp
+	if cam_tpp > 0.001:
+		var from := head.global_position
+		var to := head.global_transform * local
+		var q := PhysicsRayQueryParameters3D.create(from, to + (to - from).normalized() * 0.25, 1, [get_rid()])
+		var hit := get_world_3d().direct_space_state.intersect_ray(q)
+		if not hit.is_empty():
+			var d := maxf(from.distance_to(hit.position) - 0.3, 0.2)
+			local = local.normalized() * minf(d, local.length())
+	camera.position = local
+	var shadow_only := cam_tpp < 0.35
+	if shadow_only != _body_shadow_only:
+		_body_shadow_only = shadow_only
+		body.set_shadow_only(shadow_only)
+	view_model.visible = alive and not downed and not scope_hide and shadow_only and parachute_state == 0
+
+
+func _update_body(delta: float) -> void:
+	var w := inv.active()
+	var mode := "ground"
+	if not alive:
+		mode = "dead"
+	elif downed:
+		mode = "downed"
+	elif parachute_state == 1:
+		mode = "freefall"
+	elif parachute_state == 2:
+		mode = "chute"
+	if mode != body.mode:
+		body.set_mode(mode)
+	body.update(delta, {
+		"speed": Vector2(velocity.x, velocity.z).length(),
+		"on_floor": is_on_floor() or parachute_state > 0,
+		"crouch": crouching or sliding,
+		"armed": w != null and using_item == "",
+		"pistol": w != null and w.data.category == "PISTOL",
+		"firing": w != null and w.cooldown > 0.0 and input.fire,
+		"pitch": pitch,
+	})
+
+
+## Weapon bar / number keys: 0 and 1 = weapon slots, 2 = fists (holster; FIRE then punches/knifes).
+func select_slot(i: int) -> void:
+	if downed or vehicle:
+		return
+	if i == 2:
+		if not inv.holstered:
+			inv.holster()
+			AudioManager.play_2d("res://assets/audio/ui/switch_002.ogg", -12.0)
+		return
+	if inv.weapons[i] != null and (inv.holstered or inv.current != i):
+		inv.switch_to(i)
+		AudioManager.play_2d("res://assets/audio/ui/switch_002.ogg", -10.0)
+
+
 func _handle_weapon(delta: float) -> void:
 	var w := inv.active()
+	_melee_swing = maxf(_melee_swing - delta, 0.0)
 	if w == null:
 		ads_blend = move_toward(ads_blend, 0.0, delta * 6.0)
+		# Fists / knife out: FIRE attacks.
+		if input.fire and not downed and parachute_state == 0 and using_item == "" and do_melee(camera.global_position, look_dir()):
+			view_model.on_melee()
 		return
 	var can_aim := ads_on and not sprinting and using_item == "" and parachute_state == 0 and not downed
 	var ads_speed := 1.0 / maxf(float(w.stats.ads_time), 0.05)
@@ -514,11 +661,18 @@ func _handle_weapon(delta: float) -> void:
 	var target_fov := lerpf(base_fov + (6.0 if sliding else 0.0), float(w.stats.ads_fov), ads_blend)
 	camera.fov = lerpf(camera.fov, target_fov, clampf(delta * 18.0, 0, 1))
 	var auto_fire: bool = SaveManager.get_setting("controls", "auto_fire", false) and touch_mode and on_target
-	var trigger := (input.fire or auto_fire) and not view_model.is_busy() and parachute_state == 0
+	var trigger := (input.fire or auto_fire) and not view_model.is_busy() and parachute_state != 1
 	if trigger and sprinting:
 		sprinting = false
+	var dir := look_dir()
 	var origin := camera.global_position
-	process_trigger(trigger, origin, look_dir(), view_model.muzzle_global(), ads_blend > 0.6, is_moving(), current_spread())
+	var muzzle := view_model.muzzle_global()
+	if cam_tpp > 0.01:
+		# Third person: start the shot at the point of the camera ray level with the player, so
+		# nothing between the camera and the player can block it; tracers leave the body's gun.
+		origin += dir * maxf(0.0, (head.global_position - origin).dot(dir))
+		muzzle = body.gun_holder.global_position + dir * 0.7
+	process_trigger(trigger, origin, dir, muzzle, ads_blend > 0.6, is_moving(), current_spread())
 
 
 func is_moving() -> bool:
@@ -590,6 +744,7 @@ func _on_died() -> void:
 	ads_blend = 0.0
 	view_model.visible = false
 	using_item = ""
+	parachute_state = 0
 
 
 func set_death_cam_target(killer: Actor) -> void:
@@ -707,11 +862,16 @@ func _auto_pick_goal(m: Node) -> Vector3:
 func _autopilot(delta: float) -> void:
 	input.move = Vector2.ZERO
 	input.fire = false
+	if parachute_state == 1:
+		# Dive like a player in a hurry: look straight down, then glide when the chute opens.
+		input.look = Vector2(0, -rad_to_deg(deg_to_rad(-80.0) - pitch)) * clampf(delta * 6.0, 0, 1)
+		return
 	_auto_retarget -= delta
 	if _auto_retarget <= 0.0:
 		_auto_retarget = 0.3
 		_auto_target = null
-		var best := 70.0
+		# Unarmed: only fight back at fist range, otherwise keep looking for a weapon.
+		var best := 70.0 if inv.active() != null else 3.0
 		for n in get_tree().get_nodes_in_group("actors"):
 			var a: Actor = n
 			if not a.alive or not a.visible or not is_enemy(a) or a.parachute_active():

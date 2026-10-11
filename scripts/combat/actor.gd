@@ -7,6 +7,7 @@ signal died(victim: Actor, killer: Actor, weapon_name: String, headshot: bool)
 signal damaged(amount: float, from_pos: Vector3, attacker: Actor)
 signal shot_fired(actor: Actor, suppressed: bool)
 signal hit_confirmed(headshot: bool, killed: bool)
+signal damage_dealt(victim: Actor, amount: float, headshot: bool, armor_hit: bool)
 signal item_used(item_id: String)
 signal knocked(victim: Actor, attacker: Actor, weapon_name: String)
 signal revived(victim: Actor, reviver: Actor)
@@ -134,8 +135,9 @@ func take_damage(amount: float, attacker: Actor, weapon_name: String = "", heads
 	if invulnerable_time > 0.0 and attacker != null:
 		return false
 	var dmg := amount
+	var absorbed := 0.0
 	if armor > 0.0 and attacker != null:
-		var absorbed := minf(armor, dmg * 0.75)
+		absorbed = minf(armor, dmg * 0.75)
 		armor -= absorbed
 		dmg -= absorbed
 	health -= dmg
@@ -144,6 +146,7 @@ func take_damage(amount: float, attacker: Actor, weapon_name: String = "", heads
 		_damagers[attacker] = Time.get_ticks_msec()
 		attacker.shots_hit += 1
 		attacker.hit_confirmed.emit(headshot, health <= 0.0)
+		attacker.damage_dealt.emit(self, amount, headshot, absorbed > 0.0)
 	_cancel_use()
 	damaged.emit(amount, from_pos, attacker)
 	if health <= 0.0:

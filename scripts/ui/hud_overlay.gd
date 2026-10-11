@@ -10,6 +10,8 @@ var hit_kill := false
 var damage_dirs: Array = []   ## {pos: Vector3, t: float}
 var _font: Font
 var _spread_px := 0.0
+var dmg_numbers: Array = []   ## {victim, pos: Vector3, amount, head, armor, t}
+const DMG_NUMBER_TIME := 0.9
 
 
 func _ready() -> void:
@@ -25,6 +27,24 @@ func on_hit(headshot: bool, killed: bool) -> void:
 	AudioManager.play_2d("res://assets/audio/sfx/hitmarker.ogg", -9.0 if not headshot else -5.0, 1.4 if headshot else 1.2)
 
 
+## Floating damage numbers (setting). Rapid hits on the same target add up into one number.
+func on_damage_dealt(victim: Actor, amount: float, headshot: bool, armor_hit: bool) -> void:
+	if not SaveManager.get_setting("controls", "damage_numbers", true) or victim == null:
+		return
+	for d in dmg_numbers:
+		if d.victim == victim and d.t > DMG_NUMBER_TIME - 0.45:
+			d.amount += amount
+			d.head = d.head or headshot
+			d.armor = armor_hit
+			d.t = DMG_NUMBER_TIME
+			d.pos = victim.global_position + Vector3(0, 2.1, 0)
+			return
+	dmg_numbers.append({"victim": victim, "pos": victim.global_position + Vector3(0, 2.1, 0), "amount": amount,
+		"head": headshot, "armor": armor_hit, "t": DMG_NUMBER_TIME, "x": randf_range(-18, 18)})
+	if dmg_numbers.size() > 8:
+		dmg_numbers.pop_front()
+
+
 func on_damaged(from_pos: Vector3) -> void:
 	damage_dirs.append({"pos": from_pos, "t": 1.2})
 	if damage_dirs.size() > 6:
@@ -36,6 +56,9 @@ func _process(delta: float) -> void:
 	for d in damage_dirs:
 		d.t -= delta
 	damage_dirs = damage_dirs.filter(func(d): return d.t > 0.0)
+	for d in dmg_numbers:
+		d.t -= delta
+	dmg_numbers = dmg_numbers.filter(func(d): return d.t > 0.0)
 	queue_redraw()
 
 
@@ -53,9 +76,10 @@ func _draw() -> void:
 			draw_rect(Rect2(0, sz.y - w, sz.x, w), Color(0.6, 0, 0, a / 6.0))
 			draw_rect(Rect2(0, 0, w, sz.y), Color(0.6, 0, 0, a / 6.0))
 			draw_rect(Rect2(sz.x - w, 0, w, sz.y), Color(0.6, 0, 0, a / 6.0))
+	_draw_damage_numbers()
 	var w := player.inv.active()
 	var scoped := w != null and bool(w.stats.scope_overlay) and player.ads_blend > 0.85
-	player.view_model.visible = player.alive and not scoped
+	player.scope_hide = scoped
 	if scoped:
 		var r := minf(sz.x, sz.y) * 0.46
 		# Black outside the scope circle
@@ -136,3 +160,22 @@ func _draw() -> void:
 	# Flash
 	if player.flash_time > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, sz), Color(1, 1, 1, clampf(player.flash_time / 1.2, 0, 0.95)))
+
+
+func _draw_damage_numbers() -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	for d in dmg_numbers:
+		var k: float = 1.0 - d.t / DMG_NUMBER_TIME
+		var wp: Vector3 = d.pos + Vector3(0, k * 0.7, 0)
+		if cam.is_position_behind(wp):
+			continue
+		var sp := cam.unproject_position(wp) + Vector2(d.x, 0)
+		var col := Color(1, 0.86, 0.25) if d.head else (Color(0.5, 0.75, 1.0) if d.armor else Color(1, 1, 1))
+		col.a = clampf(d.t / 0.3, 0.0, 1.0)
+		var fs := 26 if d.head else 22
+		var txt := str(roundi(d.amount))
+		var tw := _font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string_outline(_font, sp - Vector2(tw * 0.5, 0), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, col.a * 0.8))
+		draw_string(_font, sp - Vector2(tw * 0.5, 0), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)

@@ -22,12 +22,16 @@ var interact_held := false      ## held state (revive), not cleared per tick
 var heal := false
 var plate := false
 var touch_sprint := false       ## joystick pushed fully forward (auto sprint)
+var select_slot := -1           ## weapon bar / number keys: 0, 1 = weapon slots, 2 = fists/melee
+var toggle_view := false        ## BR: switch first/third person
 
 
 func clear_pressed() -> void:
 	look = Vector2.ZERO
 	ads_toggle = false
 	jump = false
+	select_slot = -1
+	toggle_view = false
 	crouch = false
 	sprint_toggle = false
 	reload = false
