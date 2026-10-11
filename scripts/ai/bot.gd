@@ -14,10 +14,9 @@ const NAMES := ["Hawk", "Bravo", "Kodiak", "Sable", "Rook", "Mako", "Jinx", "Tal
 var state := State.PATROL
 var diff := {}
 var agent: NavigationAgent3D
-var model: Node3D
-var anim: AnimationPlayer
+var model: ActorModel        ## animated body (also owns gun, wingsuit and parachute visuals)
 var gun_holder: Node3D
-var gun_model: Node3D
+var chute_open := false      ## BR drop: false = wingsuit freefall, true = parachute
 var name_tag: Label3D
 var aim_dir := Vector3.FORWARD
 var target: Actor = null
@@ -88,23 +87,11 @@ func _ready() -> void:
 	agent.path_max_distance = 4.0
 	add_child(agent)
 	var op := GameDB.get_operator(operator_id)
-	model = load(op.model).instantiate()
-	model.scale = Vector3.ONE * 2.65
-	model.rotation.y = PI
+	model = ActorModel.new()
+	model.name = "Body"
 	add_child(model)
-	anim = model.find_child("AnimationPlayer", true, false)
-	if anim:
-		for a in ["idle", "walk", "sprint", "holding-both", "holding-both-shoot", "crouch", "fall"]:
-			if anim.has_animation(a):
-				anim.get_animation(a).loop_mode = Animation.LOOP_LINEAR
-	for m in model.find_children("*", "GeometryInstance3D", true, false):
-		var gi := m as GeometryInstance3D
-		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if SaveManager.get_setting("graphics", "effects_quality", 1) >= 1 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		# Distance culling keeps far bots cheap on mobile.
-		gi.visibility_range_end = 220.0
-	gun_holder = Node3D.new()
-	gun_holder.position = Vector3(0.12, 1.12, 0.0)
-	add_child(gun_holder)
+	model.setup(op.model)
+	gun_holder = model.gun_holder
 	name_tag = Label3D.new()
 	name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	name_tag.no_depth_test = false
@@ -116,19 +103,21 @@ func _ready() -> void:
 	add_child(name_tag)
 	_refresh_gun_model()
 	inv.changed.connect(_refresh_gun_model)
+	_apply_body_quality()
 	last_pos = global_position
 
 
 func _refresh_gun_model() -> void:
-	var w := inv.active()
-	if gun_model:
-		gun_model.queue_free()
-		gun_model = null
-	if w == null:
-		return
-	gun_model = load(w.data.model_path).instantiate()
-	gun_model.position = Vector3(0, 0, -0.32)
-	gun_holder.add_child(gun_model)
+	model.set_weapon(inv.active())
+	_apply_body_quality()
+
+
+func _apply_body_quality() -> void:
+	model.set_cast_shadows(SaveManager.get_setting("graphics", "effects_quality", 1) >= 1)
+	# Distance culling keeps far bots cheap on mobile (the parachute stays visible further).
+	model.set_visibility_range(220.0)
+	for g in model.chute.find_children("*", "GeometryInstance3D", true, false):
+		(g as GeometryInstance3D).visibility_range_end = 400.0
 
 
 func set_tag_style(friendly: bool, visible_to_player: bool) -> void:
@@ -374,7 +363,6 @@ func _puppet_update(delta: float) -> void:
 	global_position = global_position.lerp(target_pos, clampf(delta * 14.0, 0.0, 1.0))
 	rotation.y = lerp_angle(rotation.y, _net_yaw, clampf(delta * 16.0, 0.0, 1.0))
 	aim_dir = Vector3(-sin(rotation.y) * cos(_net_pitch), sin(_net_pitch), -cos(rotation.y) * cos(_net_pitch))
-	gun_holder.rotation.x = _net_pitch
 	velocity = _net_vel
 	_animate()
 
@@ -401,7 +389,6 @@ func _update_aim(delta: float) -> void:
 	var flat := Vector3(aim_dir.x, 0, aim_dir.z)
 	if flat.length() > 0.05:
 		rotation.y = atan2(-flat.x, -flat.z)
-	gun_holder.rotation.x = asin(clampf(aim_dir.y, -1, 1))
 
 
 func _act(delta: float) -> void:
@@ -606,35 +593,33 @@ func _move(delta: float) -> void:
 
 
 func _animate() -> void:
-	if anim == null:
-		return
+	var w := inv.active()
 	var hs := Vector2(velocity.x, velocity.z).length()
-	var a := "idle"
-	if not (_net_floor if puppet else is_on_floor()):
-		a = "fall"
-	elif current_height < HEIGHT:
-		a = "crouch"
-	elif (state == State.ENGAGE or puppet) and inv.active() and hs < 4.0:
-		a = "holding-both-shoot" if burst_left > 0.0 else "holding-both"
-	elif hs > 5.2:
-		a = "sprint"
-	elif hs > 0.6:
-		a = "walk"
-	if a != cur_anim and anim.has_animation(a):
-		cur_anim = a
-		anim.play(a, 0.15)
+	var mode := "ground"
+	if not alive:
+		mode = "dead"
+	elif downed:
+		mode = "downed"
+	elif parachute:
+		mode = "chute" if chute_open else "freefall"
+	if mode != model.mode:
+		model.set_mode(mode)
+	model.update(get_physics_process_delta_time(), {
+		"speed": hs,
+		"on_floor": (_net_floor if puppet else is_on_floor()) or parachute,
+		"crouch": current_height < HEIGHT - 0.05,
+		"armed": w != null,
+		"pistol": w != null and w.data.category == "PISTOL",
+		"firing": burst_left > 0.0 or (w != null and w.cooldown > 0.0),
+		"pitch": asin(clampf(aim_dir.y, -1, 1)),
+	})
 
 
 func _on_died() -> void:
 	name_tag.visible = false
-	model.rotation.x = 0.0
-	model.position.y = 0.0
-	if anim and anim.has_animation("die"):
-		cur_anim = "die"
-		anim.play("die", 0.1)
+	model.set_mode("dead")
+	model.update(0.016, {})
 	target = null
-	if gun_model:
-		gun_model.visible = false
 
 
 func _on_respawned() -> void:
@@ -644,8 +629,7 @@ func _on_respawned() -> void:
 	last_seen_t = 99.0
 	cur_anim = ""
 	set_height(HEIGHT)
-	if gun_model:
-		gun_model.visible = true
+	model.set_mode("ground")
 
 
 # ---------------- Helpers ----------------
@@ -682,19 +666,13 @@ func _on_knocked() -> void:
 	state = State.DOWNED
 	target = null
 	burst_left = 0.0
-	model.rotation.x = deg_to_rad(-62.0)
-	model.position.y = 0.25
-	if gun_model:
-		gun_model.visible = false
+	model.set_mode("downed")
 
 
 func _on_revived() -> void:
 	state = State.PATROL
-	model.rotation.x = 0.0
-	model.position.y = 0.0
 	cur_anim = ""
-	if gun_model:
-		gun_model.visible = true
+	model.set_mode("ground")
 
 
 func _patrol_point() -> Vector3:
@@ -744,18 +722,35 @@ func _find_loot() -> Node3D:
 	return best
 
 
+## BR drop: wingsuit glide towards the drop target, parachute opens near the ground.
 func _parachute(delta: float) -> void:
 	var to := drop_target - global_position
 	to.y = 0
+	var agl := _height_above_ground()
+	if not chute_open and agl < Player.CHUTE_AUTO_AGL:
+		chute_open = true
 	var hv := Vector3.ZERO
+	var fall := Player.CHUTE_FALL if chute_open else Player.GLIDE_FALL
 	if to.length() > 2.0:
-		hv = to.normalized() * 12.0
-	velocity = Vector3(hv.x, -7.0, hv.z)
+		hv = to.normalized() * (Player.CHUTE_SPEED if chute_open else Player.GLIDE_SPEED)
+		# Dive when the target is close below (falls faster, like players do).
+		if not chute_open and to.length() < agl * 0.5:
+			fall = Player.DIVE_FALL
+			hv *= 0.4
+	velocity = velocity.lerp(Vector3(hv.x, -fall, hv.z), clampf(delta * 2.0, 0, 1))
+	if hv.length() > 0.5:
+		rotation.y = lerp_angle(rotation.y, atan2(-hv.x, -hv.z), clampf(delta * 3.0, 0, 1))
 	move_and_slide()
-	if anim and cur_anim != "fall" and anim.has_animation("fall"):
-		cur_anim = "fall"
-		anim.play("fall")
+	_animate()
 	if is_on_floor():
 		parachute = false
+		chute_open = false
+		model.set_mode("ground")
 		state = State.PATROL
 		move_goal = global_position
+
+
+func _height_above_ground() -> float:
+	var q := PhysicsRayQueryParameters3D.create(global_position, global_position + Vector3.DOWN * 400.0, 1)
+	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	return global_position.y - (hit.position.y if not hit.is_empty() else 0.0)
