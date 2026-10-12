@@ -8,6 +8,8 @@ signal interact_target_changed(target: Node)
 signal vehicle_changed(v: Vehicle)
 signal killed_enemy(victim: Actor, headshot: bool)
 
+signal skill_used(skill_id: String)
+
 const WALK_SPEED := 5.0
 const SPRINT_SPEED := 7.2
 const CROUCH_SPEED := 2.7
@@ -119,6 +121,7 @@ func _ready() -> void:
 	inv.changed.connect(_on_inv_changed)
 	SaveManager.settings_changed.connect(func(): base_fov = float(SaveManager.get_setting("graphics", "fov", 80.0)))
 	yaw = rotation.y
+	setup_skill(str(SaveManager.current_loadout().get("skill", "rewind")))
 
 
 func equip_current() -> void:
@@ -174,6 +177,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("interact"): input.interact = true
 	elif event.is_action_pressed("heal"): input.heal = true
 	elif event.is_action_pressed("plate"): input.plate = true
+	elif event.is_action_pressed("skill"): input.skill = true
 	elif event.is_action_pressed("ads") and SaveManager.get_setting("controls", "ads_mode", "toggle") == "toggle":
 		input.ads_toggle = true
 
@@ -392,6 +396,21 @@ func _aim_assist(delta: float, lk: Vector2) -> void:
 		pitch = lerpf(pitch, target_pitch, clampf(delta * 1.6, 0, 0.06))
 
 
+## Fire the operator skill along the view direction (keyboard K / touch SKILL button).
+func use_skill() -> bool:
+	if skill == null or downed or using_item != "":
+		return false
+	if not skill.activate(look_dir()):
+		if skill.charge >= 1.0:
+			AudioManager.play_2d("res://assets/audio/ui/error_001.ogg", -8.0)
+		return false
+	sliding = false
+	shake = maxf(shake, 0.35)
+	view_model.on_skill(skill.id)
+	skill_used.emit(skill.id)
+	return true
+
+
 func _handle_actions() -> void:
 	if input.toggle_view and MatchConfig.mode == "br":
 		SaveManager.set_setting("controls", "br_view", "fpp" if wants_tpp() else "tpp")
@@ -412,6 +431,8 @@ func _handle_actions() -> void:
 		view_model.on_melee()
 	if input.inspect:
 		view_model.inspect()
+	if input.skill:
+		use_skill()
 	if input.lethal and throw_equipment("lethal", camera.global_position, look_dir()):
 		view_model.on_throw()
 	if input.tactical and throw_equipment("tactical", camera.global_position, look_dir()):
@@ -430,10 +451,80 @@ func _handle_actions() -> void:
 		ads_on = false
 
 
+## Mantle: jump while pushing towards a ledge 0.5-1.7 m high and the operator climbs onto it
+## (hands-up view model animation, camera dip, short arc instead of a jump).
+const MANTLE_TIME := 0.42
+var mantle_t := -1.0
+var _mantle_from := Vector3.ZERO
+var _mantle_to := Vector3.ZERO
+
+
+func _try_mantle() -> bool:
+	if downed or input.move.y > -0.3 or using_item != "":
+		return false
+	var fwd := -global_transform.basis.z
+	fwd.y = 0
+	fwd = fwd.normalized()
+	var space := get_world_3d().direct_space_state
+	var chest := global_position + Vector3.UP * 0.9
+	var q := PhysicsRayQueryParameters3D.create(chest, chest + fwd * 0.9, 1)
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit.is_empty() or absf(hit.normal.y) > 0.5:
+		return false
+	var probe: Vector3 = hit.position + fwd * 0.35
+	var q2 := PhysicsRayQueryParameters3D.create(Vector3(probe.x, global_position.y + 2.1, probe.z), Vector3(probe.x, global_position.y + 0.3, probe.z), 1)
+	q2.exclude = [get_rid()]
+	var top := space.intersect_ray(q2)
+	if top.is_empty() or top.normal.y < 0.7:
+		return false
+	var h: float = top.position.y - global_position.y
+	if h < 0.5 or h > 1.7:
+		return false
+	# Room to stand (at least crouch height) on top.
+	var q3 := PhysicsRayQueryParameters3D.create(top.position + Vector3.UP * 0.05, top.position + Vector3.UP * CROUCH_HEIGHT, 1)
+	q3.exclude = [get_rid()]
+	if not space.intersect_ray(q3).is_empty():
+		return false
+	_mantle_from = global_position
+	_mantle_to = top.position + fwd * 0.25 + Vector3.UP * 0.02
+	mantle_t = 0.0
+	velocity = Vector3.ZERO
+	sliding = false
+	view_model.on_mantle()
+	AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -12.0, 1.3)
+	return true
+
+
+func _mantle_step(delta: float) -> void:
+	mantle_t += delta
+	var k := clampf(mantle_t / MANTLE_TIME, 0.0, 1.0)
+	# Up first, then forward over the edge.
+	var up := ease(clampf(k * 1.6, 0.0, 1.0), 0.5)
+	var fw := ease(clampf((k - 0.35) / 0.65, 0.0, 1.0), 0.6)
+	var p := _mantle_from
+	p.y = lerpf(_mantle_from.y, _mantle_to.y + 0.05, up)
+	p.x = lerpf(_mantle_from.x, _mantle_to.x, fw)
+	p.z = lerpf(_mantle_from.z, _mantle_to.z, fw)
+	global_position = p
+	land_dip = sin(k * PI) * 0.12
+	head.position.y = lerpf(head.position.y, current_height - 0.15 - land_dip, clampf(delta * 14.0, 0, 1))
+	if k >= 1.0:
+		mantle_t = -1.0
+		velocity = -global_transform.basis.z * 2.0
+		was_on_floor = true
+
+
 func _move(delta: float) -> void:
 	var on_floor := is_on_floor()
 	if parachute_state > 0:
 		_parachute_move(delta)
+		return
+	if mantle_t >= 0.0:
+		_mantle_step(delta)
+		return
+	if input.jump and not sliding and not (skill and skill.active) and _try_mantle():
+		input.jump = false
 		return
 	# Sprint logic: hold shift, toggle, or push the touch joystick fully forward.
 	var forward_input := input.move.y < -0.5
@@ -529,13 +620,15 @@ func _move(delta: float) -> void:
 	velocity.z = hv.z
 	if not on_floor:
 		velocity.y -= GRAVITY * delta
+	if skill:
+		skill.apply_motion(delta)
 	var fall_speed := -velocity.y
 	move_and_slide()
 	if is_on_floor() and not was_on_floor:
 		land_dip = clampf(fall_speed * 0.012, 0.0, 0.15)
 		if fall_speed > 4.0:
 			AudioManager.play_2d("res://assets/audio/sfx/land.ogg", -8.0)
-		if fall_speed > 16.0:
+		if fall_speed > 16.0 and not (skill and skill.no_fall_damage_t > 0.0):
 			take_damage((fall_speed - 16.0) * 6.0, null, "Fall")
 	was_on_floor = is_on_floor()
 	# Footsteps

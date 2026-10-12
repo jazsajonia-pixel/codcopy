@@ -25,6 +25,7 @@ const KEYS := {
 	"interact": [KEY_F, KEY_E],
 	"heal": [KEY_H],
 	"plate": [KEY_X],
+	"skill": [KEY_K, KEY_4],
 	"pause": [KEY_ESCAPE, KEY_P],
 	"scoreboard": [KEY_TAB],
 }

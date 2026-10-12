@@ -200,6 +200,9 @@ func _build_center() -> void:
 	death_panel.add_child(death_label)
 
 
+var skill_widget: SkillWidget
+
+
 func _build_touch() -> void:
 	touch = TouchControls.new()
 	touch.player = player
@@ -216,11 +219,15 @@ func _build_touch() -> void:
 	bag.player = player
 	bag.visible = false
 	bag.closed.connect(_on_bag_closed)
+	skill_widget = SkillWidget.new()
+	skill_widget.player = player
+	root.add_child(skill_widget)
 	root.add_child(touch)
 	root.add_child(bag)
 	var scheme: String = SaveManager.get_setting("controls", "scheme", "auto")
 	var use_touch := scheme == "touch" or (scheme != "keyboard" and (DisplayServer.is_touchscreen_available() or is_mobile()))
 	touch.visible = use_touch
+	skill_widget.show_icon = not use_touch
 	player.touch_mode = use_touch
 	weapon_bar.touch = use_touch
 	if not use_touch and not MatchConfig.autoplay_player and DisplayServer.get_name() != "headless":
@@ -289,7 +296,7 @@ func _layout() -> void:
 	var vs := root.get_viewport_rect().size
 	root.position = Vector2.ZERO
 	root.size = vs
-	for full in [overlay, touch]:
+	for full in [overlay, touch, skill_widget]:
 		full.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		full.position = Vector2.ZERO
 		full.size = vs

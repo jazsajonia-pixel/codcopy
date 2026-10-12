@@ -108,6 +108,9 @@ func _ready() -> void:
 	inv.changed.connect(_refresh_gun_model)
 	_apply_body_quality()
 	last_pos = global_position
+	if not puppet:
+		var ks := GameDB.OPERATOR_SKILLS.keys()
+		setup_skill(ks[_rng.randi() % ks.size()])
 
 
 func _refresh_gun_model() -> void:
@@ -181,6 +184,7 @@ func _think() -> void:
 		state = State.DOWNED
 		return
 	_perceive()
+	_maybe_skill()
 	var w := inv.active()
 	# Reviving a downed teammate beats finishing off a downed enemy, trading shots at range,
 	# or running from the zone edge (a revive takes only a few seconds).
@@ -242,6 +246,28 @@ func _think() -> void:
 	if state != State.PATROL or global_position.distance_to(move_goal) < 2.0 or move_goal == Vector3.ZERO:
 		state = State.PATROL
 		move_goal = _patrol_point()
+
+
+## Bots use their operator skill when the situation suits it (CODM bots do the same).
+func _maybe_skill() -> void:
+	if skill == null or not skill.is_ready() or using_item != "":
+		return
+	var td := global_position.distance_to(target.global_position) if target and is_instance_valid(target) else 999.0
+	var go := false
+	match skill.id:
+		"rewind":
+			go = health < max_health * 0.35 and _since_damage < 1.0
+		"jetpack":
+			go = target != null and td > 10.0 and td < 40.0 and _rng.randf() < 0.12
+		"hook":
+			go = target != null and td > 16.0 and td < 40.0 and _rng.randf() < 0.15
+		"quickslash":
+			go = target != null and td < 7.0 and look_dir().dot((target.global_position - global_position).normalized()) > 0.8
+	if go:
+		var dir := look_dir()
+		if skill.id == "hook" and target:
+			dir = (target.global_position + Vector3.UP * 0.3 - eye_position()).normalized()
+		skill.activate(dir)
 
 
 func _perceive() -> void:
@@ -579,6 +605,8 @@ func _move(delta: float) -> void:
 	velocity.z = hv.z
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
+	if skill:
+		skill.apply_motion(delta)
 	move_and_slide()
 	# Stuck detection: jump, then pick a new goal.
 	if has_goal and dir != Vector3.ZERO:

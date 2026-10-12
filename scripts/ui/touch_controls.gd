@@ -29,6 +29,7 @@ const DEFAULTS := {
 	"pause": {"x": 0.68, "y": 0.06, "size": 52.0, "label": "II"},
 	"bag": {"x": 0.27, "y": 0.93, "size": 58.0, "label": "BAG", "br_only": true},
 	"view": {"x": 0.74, "y": 0.06, "size": 52.0, "label": "VIEW", "br_only": true},
+	"skill": {"x": 0.86, "y": 0.27, "size": 76.0, "label": "SKILL", "mp_only": true},
 }
 ## SWAP and KNIFE start hidden: the weapon bar at the bottom does both (they can be re-enabled
 ## in the HUD layout editor).
@@ -113,6 +114,8 @@ func _button_active(id: String) -> bool:
 	if id == "joystick" or not layout[id].visible:
 		return false
 	if DEFAULTS[id].get("br_only", false) and not br_mode and not edit_mode:
+		return false
+	if DEFAULTS[id].get("mp_only", false) and not edit_mode and (br_mode or player == null or player.skill == null):
 		return false
 	if driving and not edit_mode:
 		return id in ["interact", "jump", "pause", "score"] or (flying and id == "crouch")
@@ -296,6 +299,7 @@ func _press(id: String) -> void:
 		"plate": inp.plate = true
 		"sprint": inp.sprint_toggle = true
 		"view": inp.toggle_view = true
+		"skill": inp.skill = true
 		"bag":
 			if on_bag.is_valid(): on_bag.call()
 		"pause":
@@ -367,6 +371,11 @@ func _draw() -> void:
 			var fill := Color(UITheme.ACCENT, 0.55 * op) if held else Color(0, 0, 0, 0.38 * op)
 			if id in ["fire", "fire_left"] and not held:
 				fill = Color(0.6, 0.12, 0.08, 0.42 * op)
+			if id == "skill" and player and player.skill:
+				SkillWidget.draw_icon(self, _font, c, r, player.skill, "", op)
+				if edit_mode and id == selected:
+					draw_arc(c, r + 6, 0, TAU, 48, UITheme.ACCENT, 3.0, true)
+				continue
 			draw_circle(c, r, fill)
 			draw_arc(c, r, 0, TAU, 40, Color(1, 1, 1, 0.6 * op), 2.5, true)
 			var label: String = d.label

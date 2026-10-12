@@ -60,6 +60,7 @@ var last_hit_from := Vector3.ZERO   ## where the most recent damage came from (d
 var last_hit_force := 1.0           ## 1 = bullet, ~3+ = explosion / heavy hit
 var inv := Inventory.new()
 var operator_id := "op_sentinel"
+var skill: OperatorSkill = null   ## operator skill (multiplayer only)
 
 var _since_damage := 99.0
 var _damagers := {}           ## Actor -> last damage time (msec), for assists
@@ -102,6 +103,13 @@ func set_height(h: float) -> void:
 	current_height = h
 	capsule.height = h
 	collision.position.y = h * 0.5
+
+
+## Give this actor an operator skill (multiplayer modes only; Battle Royale has none).
+func setup_skill(skill_id: String) -> void:
+	if skill or MatchConfig.mode == "br" or skill_id == "":
+		return
+	skill = OperatorSkill.create(self, skill_id)
 
 
 func parachute_active() -> bool:
@@ -309,6 +317,8 @@ func respawn_at(xform: Transform3D) -> void:
 			w.mag = w.mag_size()
 			w._reserve = int(w.stats.reserve_ammo)
 			w.cancel_reload()
+	if skill:
+		skill.on_respawn()
 	_on_respawned()
 
 
@@ -334,6 +344,8 @@ func tick_common(delta: float) -> void:
 	shake = maxf(shake - delta * 2.5, 0.0)
 	melee_cooldown = maxf(melee_cooldown - delta, 0.0)
 	equip_cooldown = maxf(equip_cooldown - delta, 0.0)
+	if skill:
+		skill.tick(delta)
 	_since_damage += delta
 	if alive and regen_enabled and _since_damage > regen_delay and health < max_health:
 		health = minf(health + regen_rate * delta, max_health)

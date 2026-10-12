@@ -147,5 +147,29 @@ func _run() -> void:
 	p.crouching = true
 	await _frames(2)
 	check(p.current_spread() < hip, "crouching tightens the crosshair (%.2f < %.2f)" % [p.current_spread(), hip])
+	# Mantle onto a 1.2 m crate in front of the player.
+	p.crouching = false
+	await _reset()
+	var crate := StaticBody3D.new()
+	var ccs := CollisionShape3D.new()
+	var cb := BoxShape3D.new()
+	cb.size = Vector3(3, 1.2, 3)
+	ccs.shape = cb
+	crate.add_child(ccs)
+	add_child(crate)
+	crate.global_position = Vector3(0, 0.6, -2.2)
+	p.rotation.y = 0.0
+	p.yaw = 0.0
+	await _run_fwd(20, false)
+	p.input.jump = true
+	await _run_fwd(1, false)
+	check(p.mantle_t >= 0.0, "jump at a 1.2 m ledge starts a mantle")
+	await _run_fwd(40, false)
+	check(p.global_position.y > 1.1 and p.mantle_t < 0.0, "mantled on top of the crate (y=%.2f)" % p.global_position.y)
+	crate.queue_free()
+	await _reset()
+	p.input.jump = true
+	await _run_fwd(1, false)
+	check(p.mantle_t < 0.0 and p.velocity.y > 2.0, "jump with no ledge is a normal jump")
 	print("=== RESULT moves: %d passed, %d failed ===" % [passed, failed])
 	get_tree().quit(0 if failed == 0 else 1)

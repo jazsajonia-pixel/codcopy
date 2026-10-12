@@ -233,3 +233,67 @@ func _s_scope(m, p: Player) -> void:
 			if t - st > 1.2:
 				snap("scope_4x_ads")
 				get_tree().quit()
+
+
+## Operator skills: fire each one and capture first-person (and an outside view for jetpack / hook).
+var _sk_list := ["hook", "jetpack", "quickslash", "rewind"] if OS.get_environment("QA_SKILLS") == "" else Array(OS.get_environment("QA_SKILLS").split(","))
+var _sk_i := 0
+var _sk_cam: Camera3D
+func _s_skills(m, p: Player) -> void:
+	match step:
+		0:
+			if t > 4.0 and p.is_on_floor():
+				step = 1
+		1:
+			if _sk_i >= _sk_list.size():
+				get_tree().quit()
+				return
+			var id: String = _sk_list[_sk_i]
+			if p.skill:
+				p.skill.queue_free()
+				p.skill = null
+			p.setup_skill(id)
+			p.skill.charge = 1.0
+			if id == "rewind":
+				p.skill._hist.clear()
+				for i in 30:
+					p.skill._hist.append({"p": p.global_position + p.global_transform.basis.x * (i * 0.25), "h": 100.0, "a": 0.0})
+			p.pitch = -0.12 if id == "hook" else 0.0
+			st = t
+			step = 2
+		2:
+			if t - st > 0.6:
+				var ok := p.use_skill()
+				print("skill ", _sk_list[_sk_i], " -> ", ok)
+				st = t
+				step = 3
+		3:
+			var id: String = _sk_list[_sk_i]
+			var at := {"hook": 0.25, "jetpack": 0.9, "quickslash": 0.12, "rewind": 0.12}
+			if t - st > at[id]:
+				snap("skill_" + id)
+				if id in ["jetpack", "hook"]:
+					_sk_cam = Camera3D.new()
+					m.add_child(_sk_cam)
+					var b := p.global_transform.basis
+					_sk_cam.global_position = p.global_position + b.z * 7.0 + b.x * 4.0 + Vector3.UP * 2.5
+					_sk_cam.look_at(p.global_position + Vector3.UP * 1.2)
+					_sk_cam.current = true
+					p.cam_tpp = 1.0
+					p.body.set_shadow_only(false)
+					step = 4
+				else:
+					step = 5
+				st = t
+		4:
+			if t - st > 0.15:
+				snap("skill_%s_tpp" % _sk_list[_sk_i])
+				_sk_cam.queue_free()
+				p.camera.current = true
+				p.body.set_shadow_only(true)
+				step = 5
+				st = t
+		5:
+			if t - st > 2.5 and (p.is_on_floor() or t - st > 6.0):
+				_sk_i += 1
+				step = 1

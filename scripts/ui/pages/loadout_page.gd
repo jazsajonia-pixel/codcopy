@@ -44,7 +44,7 @@ func _ready() -> void:
 	body.add_child(slots)
 	var rule := UITheme.label("MULTIPLAYER: 1 GUN + MELEE", 14, UITheme.ACCENT)
 	slots.add_child(rule)
-	for s in ["primary", "melee", "lethal", "tactical"]:
+	for s in ["primary", "melee", "lethal", "tactical", "skill"]:
 		var b := UITheme.button("", func(): _select_slot(s), Vector2(250, 70), "select")
 		b.toggle_mode = true
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -98,6 +98,8 @@ func _slot_text(s: String) -> String:
 			return "%s\n%s" % [s.to_upper(), GameDB.get_weapon(lo[s]).display_name]
 		"melee":
 			return "MELEE\n%s" % GameDB.MELEE[lo.melee].name
+		"skill":
+			return "OPERATOR SKILL\n%s" % GameDB.OPERATOR_SKILLS[lo.get("skill", "rewind")].name
 		_:
 			return "%s\n%s" % [s.to_upper(), GameDB.EQUIPMENT[lo[s]].name]
 
@@ -119,6 +121,9 @@ func _select_slot(s: String) -> void:
 		"melee":
 			for id in GameDB.MELEE.keys():
 				options.append([id, GameDB.MELEE[id].name, GameDB.MELEE[id].unlock])
+		"skill":
+			for id in GameDB.OPERATOR_SKILLS.keys():
+				options.append([id, GameDB.OPERATOR_SKILLS[id].name, GameDB.OPERATOR_SKILLS[id].unlock])
 		"lethal", "tactical":
 			for id in GameDB.EQUIPMENT.keys():
 				if GameDB.EQUIPMENT[id].kind == s:
@@ -128,7 +133,7 @@ func _select_slot(s: String) -> void:
 		var txt: String = o[1] + ("   [LVL %d]" % o[2] if locked else "")
 		var b := UITheme.button(txt, func(): _choose(o[0]), Vector2(260, 56), "select")
 		b.toggle_mode = true
-		b.set_pressed_no_signal(lo[s] == o[0])
+		b.set_pressed_no_signal(lo.get(s, "") == o[0])
 		b.disabled = locked
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_font_size_override("font_size", 17)
@@ -168,6 +173,13 @@ func _show_detail() -> void:
 			var m: Dictionary = GameDB.MELEE[lo.melee]
 			detail.add_child(UITheme.label(m.name, 26, UITheme.ACCENT))
 			detail.add_child(UITheme.label("Damage %d   Range %.1f m   Cooldown %.2f s" % [m.damage, m.range, m.cooldown], 18))
+		"skill":
+			var sk: Dictionary = GameDB.OPERATOR_SKILLS[lo.get("skill", "rewind")]
+			detail.add_child(UITheme.label(sk.name, 26, sk.color))
+			var dl := UITheme.label(sk.desc, 18)
+			dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			detail.add_child(dl)
+			detail.add_child(UITheme.label("Charge %d s  (kills and damage charge it faster)   Multiplayer only" % int(sk.charge), 16, UITheme.MUTED))
 		_:
 			var e: Dictionary = GameDB.EQUIPMENT[lo[slot]]
 			detail.add_child(UITheme.label(e.name, 26, UITheme.ACCENT))

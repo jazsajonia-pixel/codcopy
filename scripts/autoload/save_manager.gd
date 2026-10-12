@@ -86,11 +86,11 @@ const DEFAULT_PROFILE := {
 	"loadout_index": 0,
 	"loadouts": [
 		{"name": "Assault", "primary": "ar_m4k", "secondary": "pistol_p9", "melee": "knife",
-		 "lethal": "frag", "tactical": "smoke", "attachments": {}, "skins": {}},
+		 "lethal": "frag", "tactical": "smoke", "skill": "rewind", "attachments": {}, "skins": {}},
 		{"name": "Close Quarters", "primary": "smg_vx", "secondary": "pistol_p9", "melee": "hatchet",
-		 "lethal": "frag", "tactical": "smoke", "attachments": {}, "skins": {}},
+		 "lethal": "frag", "tactical": "smoke", "skill": "quickslash", "attachments": {}, "skins": {}},
 		{"name": "Long Range", "primary": "sniper_ls7", "secondary": "smg_vx", "melee": "knife",
-		 "lethal": "frag", "tactical": "smoke", "attachments": {}, "skins": {}},
+		 "lethal": "frag", "tactical": "smoke", "skill": "hook", "attachments": {}, "skins": {}},
 	],
 }
 
@@ -114,6 +114,9 @@ func load_all() -> void:
 	# Ensure there are always 3 loadouts.
 	while profile.loadouts.size() < 3:
 		profile.loadouts.append(DEFAULT_PROFILE.loadouts[profile.loadouts.size()].duplicate(true))
+	for lo in profile.loadouts:
+		if not lo.has("skill") or not GameDB.OPERATOR_SKILLS.has(str(lo.skill)):
+			lo["skill"] = "rewind"
 
 
 func _load_settings() -> Dictionary:

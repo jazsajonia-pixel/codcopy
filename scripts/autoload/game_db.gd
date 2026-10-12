@@ -109,6 +109,19 @@ const SKINS := {
 	"gold": {"name": "Gold", "color": Color(1.0, 0.78, 0.15, 0.6), "unlock": 15},
 }
 
+## Operator skills (multiplayer only). charge = seconds to fill the meter by time alone; kills and damage
+## fill it faster. Chosen per loadout ("skill").
+const OPERATOR_SKILLS := {
+	"rewind": {"name": "Rewind", "short": "RWD", "unlock": 1, "charge": 42.0, "color": Color(0.35, 0.72, 1.0),
+		"desc": "Snap back to where you were 3 seconds ago, restoring the health and armor you had then."},
+	"jetpack": {"name": "Jetpack", "short": "JET", "unlock": 1, "charge": 36.0, "color": Color(1.0, 0.6, 0.2),
+		"desc": "Blast into the air, then hover down slowly. No fall damage while flying."},
+	"hook": {"name": "Grapple Hook", "short": "HOOK", "unlock": 3, "charge": 26.0, "color": Color(0.3, 0.95, 0.55),
+		"desc": "Fire a grappling hook at any surface within 45 m and reel yourself in."},
+	"quickslash": {"name": "Quick Slash", "short": "SLASH", "unlock": 5, "charge": 32.0, "color": Color(0.55, 0.95, 1.0),
+		"desc": "Lightning dash 9 m forward with an energy blade, cutting down every enemy in the path."},
+}
+
 const MP_MODES := {
 	"tdm": {"name": "Team Deathmatch", "desc": "5v5. First team to the score limit wins.", "score_limit": 40, "time_limit": 480.0, "team_size": 5},
 	"dom": {"name": "Domination", "desc": "5v5. Capture and hold flags A, B and C. Each held flag scores a point every 2 seconds.", "score_limit": 100, "time_limit": 600.0, "team_size": 5},

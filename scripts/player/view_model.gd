@@ -301,6 +301,29 @@ func on_shot() -> void:
 		Effects.muzzle_smoke(flash.global_position, -gb.z)
 
 
+var skill_dip := 0.0   ## 0..1 operator skill flourish (gun dips and rolls away)
+
+
+## Operator skill animation: hook = left-hand throw, quick slash = blade swing, others = gun dip/roll.
+func on_skill(kind: String) -> void:
+	match kind:
+		"hook":
+			throw_t = 0.45
+		"quickslash":
+			melee_t = 0.3
+			skill_dip = 0.6
+		_:
+			skill_dip = 1.0
+
+
+var mantle_t := 0.0
+
+
+## Mantle: both hands (and the gun) drop out of view, then come back up.
+func on_mantle() -> void:
+	mantle_t = 0.5
+
+
 func on_melee() -> void:
 	melee_t = 0.3
 	_punch_side = 1 - _punch_side
@@ -360,6 +383,16 @@ func animate(delta: float, look_delta: Vector2, speed01: float, on_floor: bool, 
 	var base := hip.lerp(aim, ads)
 	var pos := base + bob + Vector3(-sway.x, sway.y, kick)
 	var rot := Vector3(deg_to_rad(kick_rot), 0, 0)
+	if mantle_t > 0.0:
+		mantle_t = maxf(mantle_t - delta, 0.0)
+		var mk := sin(mantle_t / 0.5 * PI)
+		pos += Vector3(0.05, -0.22, 0.08) * mk
+		rot += Vector3(-0.6, 0.3, 0.2) * mk
+	if skill_dip > 0.0:
+		skill_dip = move_toward(skill_dip, 0.0, delta * 1.8)
+		var sd := sin(skill_dip * PI * 0.5)
+		pos += Vector3(0.04, -0.12, 0.05) * sd
+		rot += Vector3(-0.35, 0.2, 0.45) * sd
 	if sprinting and ads < 0.1:
 		pos += Vector3(-0.05, -0.04, 0.03)
 		rot += Vector3(deg_to_rad(-12), deg_to_rad(28), deg_to_rad(8))
