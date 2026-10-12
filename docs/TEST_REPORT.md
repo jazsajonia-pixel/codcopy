@@ -5,6 +5,25 @@ container on 10 Oct 2026. Match suites use `--fixed-fps 60` (simulated time, not
 real time. Godot 4.7.3 does not exist yet, so nothing was tested on it. Screenshots were rendered under Xvfb with
 `--rendering-driver opengl3` (Compatibility), **not** the Mobile Vulkan renderer the project is configured for.
 
+## Round 0.8.0 (12 Oct 2026): operator skills, blocky arms, oval parachute, ADS sight fix, roster
+
+Godot 4.7.2, headless unless noted, run after the last code change of this round.
+
+| Suite | Result |
+|---|---|
+| Script/scene check | 143 resources, 0 failures |
+| **`skill_test.tscn` (new)** rewind (moves back 12.5 m, restores health), jetpack (climbs, slow hover), grapple hook (needs a surface, pulls 37 m to the wall), quick slash (dash + kill + kill refunds meter) | 16/0 |
+| `moves` (+ mantle onto a 1.2 m crate, normal jump without a ledge) | 20/0 |
+| `unit` / `menus` / `touch` / `keys` | 81/0, 19/0, 9/0, 22/0 |
+| `tdm` / `ffa` / `kc` / `hp` / `gun` / `dom` (bots now use operator skills) | 5/0, 5/0, 4/0, 4/0, 4/0, 10/0 |
+| `br` / `brfeat` / `vehicle` / `heli_test` | 8/0, 38/0, 20/0, 11/0 |
+| `squad` | 19/0 on 2 of 3 runs; one run had 1 failure (a teammate landed 71 m away) and another had 3 failures (the enemy picked for the knock test was already dead). Both are timing/randomness in the BR test, not skill code: skills are off in BR |
+| `flow` | 18/0; one earlier run failed "touch joystick drives the vehicle" (0.1 m), then passed on rerun |
+
+Visual checks (Xvfb, Mobile renderer on lavapipe): ADS views for every iron sight, red dot and holo (M4K, K47, VX,
+Hornet, P9, Breacher/Ural/Striker/Tempest shotguns, SKR DMR, RPV LMG); blocky arms hip/ADS/inspect/knife; Toon
+colour-variant lineup; oval parachute; first-person shots of each skill and an outside view of the jetpack.
+
 ## Round 0.7.0 (12 Oct 2026): CODM lobby, new operators/weapons/maps/modes, helicopter, physics drop
 
 Godot 4.7.2, headless unless noted; each suite run one at a time after the last code change of this round.

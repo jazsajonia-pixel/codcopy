@@ -3,7 +3,7 @@ extends Node
 ## devices without a visible console (phones, the Godot Android editor) can be screenshotted.
 ## Uses the Logger API (Godot 4.5+); on older versions it only shows the build label.
 
-const BUILD := "0.7.0 (2026-10-12)"
+const BUILD := "0.8.0 (2026-10-12)"
 const MAX_LINES := 8
 ## Errors that are known and harmless (they only occur at exit or in tests).
 const IGNORE := ["ObjectDB instances leaked", "resources still in use at exit", "RID allocations", "PagedAllocator"]

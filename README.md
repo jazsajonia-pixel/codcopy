@@ -83,7 +83,7 @@ aiming).
 | Heal / armor plate | H / X | Full map | M |
 | Scoreboard | Tab (hold) | Pause | Esc / P |
 | Enter / exit vehicle | F or E | Handbrake | Space (while driving) |
-| Revive teammate | hold F or E | | |
+| Revive teammate | hold F or E | Operator skill (MP) | K or 4 |
 
 Click the game window to capture the mouse.
 
@@ -99,10 +99,18 @@ Click the game window to capture the mouse.
 - **Loadout editor**: 3 saved loadouts; Multiplayer follows the CODM rule of **one primary gun + melee** (plus lethal
   and tactical; no secondary - Battle Royale weapons come from loot); a rotating 3D weapon preview; per-weapon attachments
   (optic, muzzle, barrel, grip, magazine, stock) and skins; stat bars with +/- comparison to the previous choice.
-- **Operators**: 33 chibi operators with 3D preview, unlocked by level: 12 Kenney Mini Characters, 18 Kenney Blocky
-  Characters and 3 Quaternius Toon Shooter soldiers (Sentinel, Hazard, Crimson). One `ActorModel` drives all three
-  rigs (skinned, node-animated and Mixamo-like) with height normalisation, clip mapping, aim pitch, melee swings,
-  hit flinches and physics-driven death falls.
+- **Operators**: 32 chibi operators with 3D preview, unlocked by level: 18 Kenney Blocky Characters and 14 Quaternius
+  Toon Shooter soldiers (the Soldier, Hazmat and Enemy models plus colour variants such as Frostbite, Dune, Tide,
+  Toxic, Blaze, Phantom and Shadow). The older Kenney Mini Characters were removed. One `ActorModel` drives both rigs
+  with height normalisation, clip mapping, per-operator material tints, aim pitch, melee swings, hit flinches and
+  physics-driven death falls.
+- **Operator skills** (multiplayer, chosen per loadout): **Rewind** (snap back to where you were 3 s ago with the
+  health/armor you had then, blue after-image trail), **Jetpack** (thrust then slow powered hover, twin flame jets,
+  no fall damage), **Grapple Hook** (hooks any surface within 45 m and reels you in, visible rope) and **Quick Slash**
+  (9 m lightning dash with an energy blade that cuts down enemies in the path). The meter charges over time and
+  faster with damage and kills; HUD skill icon with charge ring (K or 4 on keyboard, SKILL button on touch), screen
+  glow and a "READY" toast. Bots carry random skills and use them (rewind when low, hook / jetpack to close distance,
+  slash at close range).
 - **Settings** (only settings that actually affect the game are shown): control scheme, sprint mode, ADS tap/hold,
   invert Y, aim assist (touch), simple-mode auto-fire, gyroscope (mobile only), camera / mouse / ADS / per-optic sensitivity,
   vertical look speed, aim acceleration, look smoothing, joystick deadzone,
@@ -143,7 +151,11 @@ Click the game window to capture the mouse.
 - **First-person arms**: rigged CC0 arms ([WRAD Arms](https://github.com/wwwriks/wrad-arms)) posed with two-bone IK
   onto each gun's grip, trigger and support points. The support hand follows the magazine on reloads, works the pump
   or bolt between shots, and there are poses for throwing, healing / plating, knife jabs and unarmed punches.
-  Pale or dark skin can be chosen in Settings > Graphics, and the sleeves are tinted to match the operator.
+  The arms are drawn in a **blocky, Roblox-like style**: square sleeve blocks, a darker cuff and cube hands riding on
+  the same IK bones, so every pose and animation still works. Pale or dark skin can be chosen in Settings > Graphics.
+- **Mantle**: jump while pushing towards a ledge 0.5-1.7 m high to climb onto it (hands drop, camera dips).
+- **Aim down sights**: iron sights, red dot and holographic sights now keep proper eye relief so the rear of the gun
+  never fills the screen; red dot / holo are open frames with a glass pane, shotguns sight along the top rib.
 
 ![First-person arms during a reload](docs/screenshots/arms_reload.jpg)
 
@@ -194,7 +206,8 @@ Click the game window to capture the mouse.
 - **Drop**: boarding countdown, then a higher (240 m) aircraft. The drop is now physics-based (`DropPhysics`: gravity
   plus quadratic drag towards terminal speeds). After jumping you fly a **wingsuit**: push forward to glide (about
   30 m/s forward, 13 m/s down), look down to dive (up to 52 m/s down). The **parachute** is clearly slower: it
-  inflates over about a second with an opening shock, then sinks at about 4 m/s (2.6 m/s when flaring) and drifts
+  is an **oval ram-air canopy** (elliptical, arched, striped cells, risers to the shoulders) that unfurls span-first
+  over about a second with an opening shock, banks with turns and swings with speed, then sinks at about 4 m/s (2.6 m/s when flaring) and drifts
   forward at 8 m/s. Landing kicks up dust. The parachute opens
   by itself at 45 m or earlier with CHUTE/Space, can be closed again with CUT/Space above 28 m, and you can fire from
   the hip under the canopy. The camera pulls back while dropping, and the HUD shows altitude and speed. Bots use the
@@ -272,6 +285,7 @@ godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- kc      # Kill C
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- hp      # Hardpoint on Firebase
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- gun     # Gun Game on Suburbia
 godot --headless --fixed-fps 60 res://tests/heli_test.tscn              # helicopter flight model (climb, hover, cyclic, yaw, landing)
+godot --headless --fixed-fps 60 res://tests/skill_test.tscn             # operator skills (rewind, jetpack, hook, quick slash)
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- br      # full BR match (shortened timings)
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- touch   # injected multi-touch input checks
 godot --headless --fixed-fps 60 res://tests/test_runner.tscn -- flow    # menu -> loading screen -> match with touch HUD (MP + BR + driving)

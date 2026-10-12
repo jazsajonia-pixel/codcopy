@@ -47,7 +47,7 @@ touch buttons) are generated in code.
 | `assets/audio/sfx/hitmarker.ogg`, `killconfirm.ogg`, `bullet_impact.ogg`, `land.ogg`, `loot_pickup.ogg`, `melee.ogg`, `assets/audio/footsteps/footstep_{concrete,grass}_00{0-4}.ogg` | [Impact Sounds](https://kenney.nl/assets/impact-sounds) | Kenney | CC0 | OGG | Renamed (from impactMetal_light_000, impactPlate_heavy_000, impactGeneric_light_000/002, impactPlank_medium_000, impactMetal_medium_000, footstep_*). |
 | `assets/audio/sfx/explosion.ogg`, `explosion_low.ogg`, `zone_warning.ogg` | [Sci-Fi Sounds](https://kenney.nl/assets/sci-fi-sounds) | Kenney | CC0 | OGG | Renamed (from explosionCrunch_000, lowFrequency_explosion_000, forceField_000). |
 | `assets/audio/ui/*.ogg` (click_001/002, confirmation_001, back_001, error_001, select_001, switch_002, toggle_001) | [Interface Sounds](https://kenney.nl/assets/interface-sounds) | Kenney | CC0 | OGG | None. |
-| `assets/audio/music/menu_music.ogg`, `assets/audio/ambience/wind.ogg`, `assets/audio/weapons/dryfire.ogg`, `assets/audio/sfx/engine_loop.ogg` (vehicle engine loop) | Original, generated for this project (procedural synthesis with Python/NumPy, encoded with ffmpeg) | This project | Same license as the project code | OGG | — |
+| `assets/audio/music/menu_music.ogg`, `assets/audio/ambience/wind.ogg`, `assets/audio/weapons/dryfire.ogg`, `assets/audio/sfx/engine_loop.ogg` (vehicle engine loop), `assets/audio/sfx/{jet_burst,hook_fire,slash,rewind,skill_ready}.ogg` (operator skills) | Original, generated for this project (procedural synthesis with Python/NumPy, encoded with ffmpeg) | This project | Same license as the project code | OGG | — |
 
 ## Procedural (no asset files)
 

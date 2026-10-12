@@ -31,6 +31,8 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if player == null or player.skill == null:
+		return
 	var sk := player.skill
 	var col: Color = sk.data.color
 	var vs := get_viewport_rect().size
